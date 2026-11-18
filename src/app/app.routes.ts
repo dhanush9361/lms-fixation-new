@@ -271,7 +271,7 @@ export const routes: Routes = [
 },
 
 {
-  path: 'setting',
+  path: 'settings',
   loadComponent: () =>
     import('./profile/settings/settings-menu/settings-menu').then((m) => m.SettingsMenu),
   title: 'Settings',
