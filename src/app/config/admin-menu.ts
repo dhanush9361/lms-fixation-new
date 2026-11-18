@@ -1,6 +1,6 @@
 import { AccessRequirement, AuthService, FEATURE, MENU } from '../services/auth';
 
-export type MenuIcon = 'dashboard' | 'role' | 'course' | 'certificate' | 'subscription';
+export type MenuIcon = 'dashboard' | 'role' | 'course' | 'certificate' | 'subscription' | 'users';
 
 
 export type MenuAccess =
@@ -58,6 +58,14 @@ export const ADMIN_MENU: readonly AdminMenuItem[] = [
     title: 'Role Management',
     route: 'role',
     icon: 'role',
+    access: { type: 'companyAdmin' },
+  },
+  {
+    id: 'users',
+    label: 'Users',
+    title: 'All Users',
+    route: 'users',
+    icon: 'users',
     access: { type: 'companyAdmin' },
   },
   {

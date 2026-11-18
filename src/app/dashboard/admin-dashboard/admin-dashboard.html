@@ -279,7 +279,7 @@
     <!-- Icon nav, placed on top of the curve.
          Built from ADMIN_MENU (config/admin-menu.ts) and filtered by the user's package / role. -->
     <nav
-      class="fixed left-0 top-16 z-10 hidden h-[calc(100vh-4rem)] w-[clamp(48px,4.5vw,84px)] flex-col items-center justify-center gap-8 sm:flex"
+      class="fixed left-0 top-16 z-10 hidden h-[calc(100vh-4rem)] w-[clamp(48px,4.5vw,84px)] flex-col items-center gap-6 overflow-y-auto py-6 [&>*:first-child]:mt-auto [&>*:last-child]:mb-auto [scrollbar-width:none] sm:flex [&::-webkit-scrollbar]:hidden"
       aria-label="Main menu"
     >
       @for (item of menuItems(); track item.id) {
@@ -302,6 +302,14 @@
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
                 <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
                 <circle cx="12" cy="7" r="4"></circle>
+              </svg>
+            }
+            @case ('users') {
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                <circle cx="9" cy="7" r="4"></circle>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
               </svg>
             }
             @case ('course') {

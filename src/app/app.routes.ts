@@ -128,6 +128,14 @@ export const routes: Routes = [
       },
 
       {
+        path: 'users',
+        canActivate: [companyAdminGuard],
+        loadComponent: () =>
+          import('./all-users/user-management/user-management').then((m) => m.UserManagement),
+        title: 'All Users',
+      },
+
+      {
   path: 'certificate-template',
   canActivate: [companyAdminGuard],
   loadComponent: () =>

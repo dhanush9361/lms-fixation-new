@@ -1,0 +1,137 @@
+<div class="relative w-full font-sans text-[#505050]">
+  <main class="relative px-5 pb-8 pt-4 md:px-7">
+
+    <!-- Header -->
+    <header class="um-rise mb-5 flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h1 class="text-xl font-semibold text-[#505050] 2xl:text-[25px]">All Users</h1>
+        <p class="mt-1 text-sm">Manage bulk user imports, exports, enrollments, unenrollments, and deletions with ease</p>
+      </div>
+
+      <div class="relative">
+        <button type="button" (click)="toggleBulk($event)"
+                class="flex h-10 min-w-[134px] cursor-pointer items-center justify-between gap-3 rounded-full bg-white px-5 text-xs shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4694A4]"
+                aria-haspopup="menu" [attr.aria-expanded]="bulkOpen()">
+          Bulk Users
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+               class="h-3.5 w-3.5 transition-transform duration-200" [class.rotate-180]="bulkOpen()" aria-hidden="true">
+            <path d="m6 9 6 6 6-6" />
+          </svg>
+        </button>
+        @if (bulkOpen()) {
+          <div role="menu" (click)="$event.stopPropagation()"
+               class="um-pop absolute right-0 top-12 z-30 w-52 origin-top-right rounded-2xl bg-white p-2 text-xs shadow-xl ring-1 ring-black/5">
+            @for (item of bulkItems; track item.id) {
+              <button type="button" role="menuitem" (click)="bulk(item.id)"
+                      class="block w-full cursor-pointer rounded-xl px-3 py-2.5 text-left transition hover:bg-[#f6f6f6] focus-visible:bg-[#f6f6f6] focus-visible:outline-none"
+                      [class.text-red-500]="item.id === 'delete'">{{ item.label }}</button>
+            }
+          </div>
+        }
+      </div>
+    </header>
+
+    <!-- Table card -->
+    <section class="um-rise rounded-[20px] bg-white pb-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" style="animation-delay: 60ms" aria-label="Users table">
+      <div class="overflow-x-auto">
+        <table class="w-full min-w-[860px] border-separate border-spacing-0 text-left text-xs">
+          <thead>
+            <tr class="[&>th]:border-b [&>th]:border-[#f0f0f0] [&>th]:py-6 [&>th]:text-[13px] [&>th]:font-medium">
+              <th class="w-[7%] pl-7">
+                <input type="checkbox" class="um-check" aria-label="Select all users"
+                       [checked]="allSelected()" [indeterminate]="someSelected()" (change)="toggleAll()" />
+              </th>
+              <th class="w-[17%] -ml-4 pl-0">Username</th>
+              <th class="w-[13%]">Role</th>
+              <th class="w-[24%]">Email</th>
+              <th class="w-[12%]">Status</th>
+              <th class="w-[17%]">Department</th>
+              <th class="w-[10%] pr-9 text-right">More Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of users(); track u.id; let i = $index) {
+              <tr class="um-row group transition-colors duration-200 hover:bg-[#fafafa] [&>td]:py-3.5"
+                  [class.bg-[#f4fafb]]="selected().has(u.id)"
+                  [style.animation-delay.ms]="120 + i * 45">
+                <td class="pl-7">
+                  <input type="checkbox" class="um-check" [attr.aria-label]="'Select ' + u.username"
+                         [checked]="selected().has(u.id)" (change)="toggleOne(u.id)" />
+                </td>
+                <td>
+                  <div class="flex items-center gap-2">
+                    <span class="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-[#2b3a42] text-[9px] font-semibold text-white transition-transform duration-200 group-hover:scale-110" aria-hidden="true">{{ u.username.slice(0, 1) }}</span>
+                    <span class="truncate">{{ u.username }}</span>
+                  </div>
+                </td>
+                <td>{{ u.role }}</td>
+                <td class="truncate">{{ u.email }}</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="h-1.5 w-1.5 rounded-full"
+                          [class]="u.status === 'Active' ? 'bg-[#61b7c5]' : u.status === 'Suspended' ? 'bg-amber-400' : 'bg-[#c4c4c4]'"></span>
+                    {{ u.status }}
+                  </span>
+                </td>
+                <td>{{ u.department }}</td>
+                <td class="pr-8">
+                  <div class="relative flex justify-end">
+                    <button type="button" (click)="toggleMenu($event, u)"
+                            class="grid h-[22px] w-[22px] cursor-pointer place-items-center rounded-full bg-[#f1f1f1] transition duration-200 hover:scale-110 hover:bg-[#61b7c5] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4694A4]"
+                            [class.bg-[#61b7c5]]="menuUserId() === u.id" [class.text-white]="menuUserId() === u.id"
+                            [attr.aria-label]="'Actions for ' + u.username" aria-haspopup="dialog" [attr.aria-expanded]="menuUserId() === u.id">
+                      <svg viewBox="0 0 24 24" fill="currentColor" class="h-3 w-3" aria-hidden="true">
+                        <circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" />
+                      </svg>
+                    </button>
+
+                    @if (menuUserId() === u.id) {
+                      <div role="dialog" [attr.aria-label]="'Actions for ' + u.username" (click)="$event.stopPropagation()"
+                           class="um-pop absolute right-9 top-[-14px] z-30 w-[140px] origin-top-right rounded-[18px] bg-[#f6f6f6] text-[10px] shadow-xl ring-1 ring-black/5">
+                        <button type="button" class="block w-full cursor-pointer rounded-t-[18px] px-5 py-3 text-left transition hover:bg-[#ececec]">Edit Profile</button>
+
+                        <div class="border-t border-[#e6e6e6] px-3 py-2">
+                          <label class="flex cursor-pointer items-center gap-2">
+                            <input type="checkbox" class="um-check um-check-sm" [checked]="pendingAction() === 'suspend'" (change)="pick('suspend')" />
+                            Suspend User
+                          </label>
+                          <div class="um-fold mt-2 grid grid-cols-2 gap-1" [class.um-fold-open]="pendingAction() === 'suspend'" [formGroup]="dates">
+                            <input type="date" formControlName="start" aria-label="Suspend start date"
+                                   class="min-w-0 rounded-full bg-white px-2 py-1 text-[8px] outline-none focus:ring-1 focus:ring-[#61b7c5]" />
+                            <input type="date" formControlName="end" aria-label="Suspend end date"
+                                   class="min-w-0 rounded-full bg-white px-2 py-1 text-[8px] outline-none focus:ring-1 focus:ring-[#61b7c5]" />
+                          </div>
+                        </div>
+
+                        @for (a of rowActions; track a.id) {
+                          <label class="flex cursor-pointer items-center gap-2 border-t border-[#e6e6e6] px-3 py-2.5 transition hover:bg-[#ececec]"
+                                 [class.text-red-500]="a.id === 'delete'">
+                            <input type="checkbox" class="um-check um-check-sm" [checked]="pendingAction() === a.id" (change)="pick(a.id)" />
+                            {{ a.label }}
+                          </label>
+                        }
+
+                        <div class="flex gap-2 border-t border-[#e6e6e6] px-3 py-3">
+                          <button type="button" (click)="closeAll()"
+                                  class="h-6 flex-1 cursor-pointer rounded-full bg-white transition hover:bg-[#e9e9e9]">Cancel</button>
+                          <button type="button" (click)="saveRow(u)" [disabled]="!pendingAction()"
+                                  class="h-6 flex-1 cursor-pointer rounded-full bg-white transition enabled:hover:bg-[#61b7c5] enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50">Save</button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="7" class="px-7 py-16 text-center text-[#9a9a9a]">No users found.</td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    @if (toast()) {
+      <div class="um-pop fixed right-8 top-24 z-50 rounded-xl bg-[#61b7c5] px-5 py-3 text-sm text-white shadow-lg" role="status">{{ toast() }}</div>
+    }
+  </main>
+</div>
