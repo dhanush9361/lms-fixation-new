@@ -66,7 +66,7 @@ export const ADMIN_MENU: readonly AdminMenuItem[] = [
     title: 'All Users',
     route: 'users',
     icon: 'users',
-    access: { type: 'companyAdmin' },
+    access: { type: 'menu', categoryId: MENU.USERS },
   },
   {
     id: 'course',
@@ -79,10 +79,10 @@ export const ADMIN_MENU: readonly AdminMenuItem[] = [
   {
     id: 'certificate',
     label: 'Certificate',
-    title: 'Certificate Template',
+    title: 'Certificate Designer',
     route: 'certificate-template',
     icon: 'certificate',
-    access: { type: 'companyAdmin' },
+    access: { type: 'menu', categoryId: MENU.CERTIFICATE },
   },
   {
     id: 'subscription',

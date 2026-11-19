@@ -1,5 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { Router } from '@angular/router';
+import { ActivatedRoute, Router } from '@angular/router';
 import {
   ChangeDetectionStrategy,
   Component,
@@ -83,6 +83,7 @@ type ProfileField =
   | 'firstName'
   | 'lastName'
   | 'email'
+  | 'department'
   | 'organizationName'
   | 'timeZone'
   | 'organizationAddress'
@@ -101,6 +102,7 @@ const FIELD_LABELS: Readonly<Record<ProfileField, string>> = {
   firstName: 'First Name',
   lastName: 'Last Name',
   email: 'Email ID',
+  department: 'Department',
   organizationName: 'Organization Name',
   timeZone: 'Time Zone',
   organizationAddress: 'Organization Address',
@@ -117,6 +119,7 @@ const MAX_LENGTHS: Readonly<Partial<Record<ProfileField, number>>> = {
   firstName: LIMITS.name,
   lastName: LIMITS.name,
   email: LIMITS.email,
+  department: 100,
   organizationName: LIMITS.organization,
   organizationAddress: 500,
   personalAddress: 500,
@@ -177,6 +180,7 @@ export class EditProfile implements OnInit {
   private readonly tokenStorage = inject(TokenStorageService);
   private readonly profileService = inject(ProfileService);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   /* ---- Template-facing constants ---- */
@@ -203,16 +207,27 @@ export class EditProfile implements OnInit {
   /** Field -> message from the server (400 validation map / 409 email). Cleared when the field is edited. */
   private readonly serverErrors = signal<Partial<Record<ProfileField, string>>>({});
 
-  /** Admin, super admin and instructor can view/update their organization name + address. */
-  protected readonly showsOrganizationFields = computed(() =>
-    ORGANIZATION_ROLES.has((this.auth.user()?.role ?? '').toUpperCase()),
+  /**
+   * Set when an admin opened this screen from All Users (route users/:userId/edit-profile).
+   * null = the logged-in user edits their own profile.
+   */
+  private readonly managedUserId: number | null = (() => {
+    const raw = this.route.snapshot.paramMap.get('userId');
+    const id = raw === null ? NaN : Number(raw);
+    return Number.isInteger(id) && id > 0 ? id : null;
+  })();
+
+  /** Role of the profile on screen (the clicked user's role when managing, otherwise your own). */
+  private readonly profileRole = signal('');
+  private readonly displayedRole = computed(
+    () => this.profileRole() || (this.auth.user()?.role ?? ''),
   );
 
-  /** Logged-in user's real role as display text, e.g. SUPER_ADMIN -> "Super Admin". */
+  /** Role as display text, e.g. SUPER_ADMIN -> "Super Admin". */
   protected readonly roleLabel = computed(() =>
-    (this.auth.user()?.role ?? '')
+    this.displayedRole()
       .toLowerCase()
-      .split('_')
+      .split(/[_\s]+/)
       .filter(Boolean)
       .map((word) => word[0].toUpperCase() + word.slice(1))
       .join(' '),
@@ -240,6 +255,7 @@ export class EditProfile implements OnInit {
       nonNullable: true,
       validators: [Validators.required, strictEmailValidator, Validators.maxLength(LIMITS.email)],
     }),
+    department: new FormControl('', { nonNullable: true, validators: [Validators.maxLength(100)] }),
     // Text, numbers and special characters allowed - only the length is limited.
     organizationName: new FormControl('', {
       nonNullable: true,
@@ -267,7 +283,24 @@ export class EditProfile implements OnInit {
 
   private lastLoaded: ProfileData | null = null;
 
+  /**
+   * Department + organization are shown to everyone but changed only by an admin from All Users
+   * (managed mode). On the user's own screen they are read-only - except the organization for roles
+   * that own one (admin / super admin / instructor), exactly as before. The server enforces the same.
+   */
+  private applyEditability(role: string): void {
+    const managing = this.managedUserId !== null;
+    const orgEditable = managing || ORGANIZATION_ROLES.has(role.toUpperCase());
+    const set = (control: AbstractControl, enabled: boolean): void =>
+      enabled ? control.enable({ emitEvent: false }) : control.disable({ emitEvent: false });
+
+    set(this.form.controls.department, managing);
+    set(this.form.controls.organizationName, orgEditable);
+    set(this.form.controls.organizationAddress, orgEditable);
+  }
+
   constructor() {
+    this.applyEditability(this.auth.user()?.role ?? '');
     this.destroyRef.onDestroy(() => {
       if (this.messageTimer) clearTimeout(this.messageTimer);
     });
@@ -331,7 +364,7 @@ export class EditProfile implements OnInit {
   private loadProfile(): void {
     this.loading.set(true);
     this.profileService
-      .getMyProfile()
+      .getMyProfile(this.managedUserId)
       .pipe(
         finalize(() => this.loading.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -349,12 +382,15 @@ export class EditProfile implements OnInit {
 
   private applyProfile(profile: ProfileData): void {
     this.lastLoaded = profile;
+    this.profileRole.set(profile.role ?? '');
+    this.applyEditability(profile.role ?? '');
 
     this.form.reset(
       {
         firstName: profile.firstName ?? '',
         lastName: profile.lastName ?? '',
         email: profile.email ?? '',
+        department: profile.department ?? '',
         organizationName: profile.organizationName ?? '',
         timeZone: profile.timeZone ?? '',
         organizationAddress: profile.organizationAddress ?? '',
@@ -443,6 +479,7 @@ export class EditProfile implements OnInit {
       firstName: v.firstName.trim(),
       lastName: v.lastName.trim(),
       email: v.email.trim().toLowerCase(),
+      department: v.department.trim(),
       organizationName: v.organizationName.trim(),
       organizationAddress: v.organizationAddress.trim(),
       personalAddress: v.personalAddress.trim(),
@@ -457,7 +494,7 @@ export class EditProfile implements OnInit {
 
     this.saving.set(true);
     this.profileService
-      .updateMyProfile(payload)
+      .updateMyProfile(payload, this.managedUserId)
       .pipe(
         finalize(() => this.saving.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -465,7 +502,8 @@ export class EditProfile implements OnInit {
       .subscribe({
         next: (profile) => {
           this.applyProfile(profile);
-          this.syncAuthUser(profile);
+          // Header / session only follow the logged-in user's own edits, never another user's.
+          if (this.managedUserId === null) this.syncAuthUser(profile);
           this.saveSuccess.set('Profile updated successfully.');
           this.autoHideMessages();
         },
@@ -479,7 +517,11 @@ export class EditProfile implements OnInit {
   this.saveSuccess.set('');
   this.pictureError.set('');
   this.openDropdown.set(null);
-  void this.router.navigate(['/admin-dashboard', 'admin-dashboard-home']);
+  void this.router.navigate(
+    this.managedUserId === null
+      ? ['/admin-dashboard', 'admin-dashboard-home']
+      : ['/admin-dashboard', 'users'],
+  );
 }
 
   /** The save success / error pop-up (top centre) disappears by itself after a few seconds. */
@@ -544,13 +586,13 @@ export class EditProfile implements OnInit {
   /* ------------------------------------------------------------------------ */
 
   protected onProfilePictureSelected(event: Event): void {
-    this.handlePicture(event, (file) => this.profileService.uploadProfilePicture(file), (p) =>
+    this.handlePicture(event, (file) => this.profileService.uploadProfilePicture(file, this.managedUserId), (p) =>
       this.profilePicturePreview.set(p.profilePictureUrl),
     );
   }
 
   protected onBackgroundPictureSelected(event: Event): void {
-    this.handlePicture(event, (file) => this.profileService.uploadBackgroundPicture(file), (p) =>
+    this.handlePicture(event, (file) => this.profileService.uploadBackgroundPicture(file, this.managedUserId), (p) =>
       this.backgroundPicturePreview.set(p.backgroundPictureUrl),
     );
   }

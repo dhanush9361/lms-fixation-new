@@ -79,9 +79,29 @@
           }
         </div>
 
-        <!-- Organization Name (admin + instructor only) -->
-        @if (showsOrganizationFields()) {
-          <div class="col-span-2">
+        <!-- Department (editable by admin; read-only for the user) -->
+                  <div class="col-span-2">
+            <div class="relative">
+              <input
+                id="department"
+                formControlName="department"
+                type="text"
+                maxlength="100"
+                placeholder=" "
+                [attr.aria-invalid]="fieldError('department') ? 'true' : null"
+                [attr.aria-describedby]="fieldError('department') ? 'department-error' : null"
+                class="peer h-11 w-full rounded-[14px] border border-transparent bg-[#f4f4f4] px-[18px] text-sm text-[#353a3d] outline-none transition-all focus:border-[#54b4c3] focus:bg-white focus:ring-[3px] focus:ring-[#54b4c3]/20 aria-[invalid=true]:border-[#b42318] disabled:cursor-not-allowed disabled:bg-[#ececec] disabled:text-[#7a7f82]"
+              />
+              <label for="department" class="float-label">Department</label>
+            </div>
+            @if (fieldError('department'); as error) {
+              <span id="department-error" class="mt-1 block text-[11px] font-medium text-[#a3211a]" role="alert">{{ error }}</span>
+            }
+          </div>
+        
+
+        <!-- Organization Name (editable by admin; read-only for the user) -->
+                  <div class="col-span-2">
             <div class="relative">
               <input
                 id="organizationName"
@@ -91,7 +111,7 @@
                 placeholder=" "
                 [attr.aria-invalid]="fieldError('organizationName') ? 'true' : null"
                 [attr.aria-describedby]="fieldError('organizationName') ? 'organizationName-error' : null"
-                class="peer h-11 w-full rounded-[14px] border border-transparent bg-[#f4f4f4] px-[18px] text-sm text-[#353a3d] outline-none transition-all focus:border-[#54b4c3] focus:bg-white focus:ring-[3px] focus:ring-[#54b4c3]/20 aria-[invalid=true]:border-[#b42318]"
+                class="peer h-11 w-full rounded-[14px] border border-transparent bg-[#f4f4f4] px-[18px] text-sm text-[#353a3d] outline-none transition-all focus:border-[#54b4c3] focus:bg-white focus:ring-[3px] focus:ring-[#54b4c3]/20 aria-[invalid=true]:border-[#b42318] disabled:cursor-not-allowed disabled:bg-[#ececec] disabled:text-[#7a7f82]"
               />
               <label for="organizationName" class="float-label">Organization Name</label>
             </div>
@@ -99,7 +119,7 @@
               <span id="organizationName-error" class="mt-1 block text-[11px] font-medium text-[#a3211a]" role="alert">{{ error }}</span>
             }
           </div>
-        }
+        
 
         <!-- Time Zone (custom dropdown) -->
         <div class="relative col-span-2" (click)="$event.stopPropagation()">
@@ -131,9 +151,8 @@
           }
         </div>
 
-        <!-- Organization Address (admin + instructor only) -->
-        @if (showsOrganizationFields()) {
-          <div class="col-span-2 sm:col-span-4">
+        <!-- Organization Address (editable by admin; read-only for the user) -->
+                  <div class="col-span-2 sm:col-span-4">
             <div class="relative">
               <textarea
                 id="organizationAddress"
@@ -143,7 +162,7 @@
                 placeholder=" "
                 [attr.aria-invalid]="fieldError('organizationAddress') ? 'true' : null"
                 [attr.aria-describedby]="fieldError('organizationAddress') ? 'organizationAddress-error' : null"
-                class="peer block h-[74px] w-full resize-none rounded-[14px] border border-transparent bg-[#f4f4f4] px-[18px] pb-6 pt-[14px] text-sm text-[#353a3d] outline-none focus:border-[#54b4c3] focus:bg-white focus:ring-[3px] focus:ring-[#54b4c3]/20 aria-[invalid=true]:border-[#b42318]"
+                class="peer block h-[74px] w-full resize-none rounded-[14px] border border-transparent bg-[#f4f4f4] px-[18px] pb-6 pt-[14px] text-sm text-[#353a3d] outline-none focus:border-[#54b4c3] focus:bg-white focus:ring-[3px] focus:ring-[#54b4c3]/20 aria-[invalid=true]:border-[#b42318] disabled:cursor-not-allowed disabled:bg-[#ececec] disabled:text-[#7a7f82]"
               ></textarea>
               <label for="organizationAddress" class="float-label float-label-area">OrganizationAddress</label>
               <span class="pointer-events-none absolute bottom-2 right-[18px] text-[11px] text-[#91979a]">Maximum 500 characters</span>
@@ -152,7 +171,7 @@
               <span id="organizationAddress-error" class="mt-1 block text-[11px] font-medium text-[#a3211a]" role="alert">{{ error }}</span>
             }
           </div>
-        }
+        
 
         <!-- Personal Address -->
         <div class="col-span-2 sm:col-span-4">
@@ -409,9 +428,9 @@
 
         <!-- Details -->
         <dl class="mt-5 flex flex-col gap-4 text-[13px] leading-[18px]">
-          @if (showsOrganizationFields()) {
-            <div class="grid grid-cols-[129px_1fr]"><dt>Organization :</dt><dd class="m-0 break-words">{{ form.controls.organizationName.value || 'Not provided' }}</dd></div>
-          }
+                      <div class="grid grid-cols-[129px_1fr]"><dt>Department :</dt><dd class="m-0 break-words">{{ form.controls.department.value || 'Not provided' }}</dd></div>
+          <div class="grid grid-cols-[129px_1fr]"><dt>Organization :</dt><dd class="m-0 break-words">{{ form.controls.organizationName.value || 'Not provided' }}</dd></div>
+          
           <div class="grid grid-cols-[129px_1fr]"><dt>Time Zone :</dt><dd class="m-0 break-words">{{ form.controls.timeZone.value || 'Not provided' }}</dd></div>
           <div class="grid grid-cols-[129px_1fr]"><dt>Address :</dt><dd class="m-0 break-words">{{ form.controls.personalAddress.value || 'Not provided' }}</dd></div>
           <div class="grid grid-cols-[129px_1fr]"><dt>Country :</dt><dd class="m-0 break-words">{{ form.controls.country.value || 'Not provided' }}</dd></div>

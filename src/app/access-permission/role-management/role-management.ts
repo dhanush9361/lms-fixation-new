@@ -27,11 +27,14 @@ import { TOGGLE_ONLY_CATEGORY_IDS } from '../../services/package.service';
 type RoleFilterField = 'Role Name' | 'Status';
 type DialogKind = 'invite' | 'role' | null;
 
+/** Category NAMES (as seeded by SystemFeatureSeeder) a role may be granted. Add a name here when a new category is seeded. */
 const ALLOWED_PERMISSION_CATEGORIES = new Set([
   'Authentication',
   'Content Management',
   'Course Management',
   'Enrollment',
+  'User Management',
+  'Certificate Designer',
 ]);
 
 @Component({

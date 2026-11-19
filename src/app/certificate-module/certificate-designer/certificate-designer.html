@@ -75,7 +75,8 @@
         <button
           type="button"
           (click)="save()"
-          [disabled]="saving() || loading() || !!loadError()"
+          [disabled]="saving() || loading() || !!loadError() || !canSave()"
+          [attr.title]="canSave() ? null : 'You do not have permission to save the template'"
           class="rounded-full bg-[#2f7684] px-6 py-2 text-xs font-semibold text-white outline-none transition hover:bg-[#276371] focus-visible:ring-2 focus-visible:ring-[#2f7684] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
           {{ saving() ? 'Saving…' : 'Save template' }}
         </button>

@@ -15,6 +15,7 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { map, startWith } from 'rxjs';
 
+import { AuthService, FEATURE } from '../../services/auth';
 import { CertificateTemplateService } from '../../services/certificate-template.service';
 import {
   CERTIFICATE_ACCENTS,
@@ -85,6 +86,9 @@ const MAX_IMAGE_WIDTH: Record<ImageKind, number> = {
 export class CertificateDesigner {
   private readonly fb = inject(FormBuilder);
   private readonly store = inject(CertificateTemplateService);
+  private readonly auth = inject(AuthService);
+  /** Package / role permission: read = open the designer, update = save the template. */
+  readonly canSave = computed(() => this.auth.can(FEATURE.CERT_TEMPLATE, 'update'));
   private readonly destroyRef = inject(DestroyRef);
   private readonly sanitizer = inject(DomSanitizer);
 
@@ -500,7 +504,7 @@ export class CertificateDesigner {
   // ---------- save ----------
 
   save(): void {
-    if (this.saving() || this.loading() || this.loadError()) return;
+    if (this.saving() || this.loading() || this.loadError() || !this.canSave()) return;
     const missing = this.missingTags();
     if (missing.length) {
       this.flash('error', `Add the ${missing.map((t) => t.label).join(' and ')} tag before saving.`);

@@ -129,15 +129,24 @@ export const routes: Routes = [
 
       {
         path: 'users',
-        canActivate: [companyAdminGuard],
+        canActivate: [menuGuard(MENU.USERS)],
         loadComponent: () =>
           import('./all-users/user-management/user-management').then((m) => m.UserManagement),
         title: 'All Users',
       },
 
+      // All Users -> row menu -> Edit Profile: the same EditProfile screen, loaded for :userId
+      {
+        path: 'users/:userId/edit-profile',
+        canActivate: [featureGuard([FEATURE.USER_ALL, 'update'])],
+        loadComponent: () =>
+          import('./profile/edit-profile/edit-profile').then((m) => m.EditProfile),
+        title: 'Edit Profile',
+      },
+
       {
   path: 'certificate-template',
-  canActivate: [companyAdminGuard],
+  canActivate: [menuGuard(MENU.CERTIFICATE)],
   loadComponent: () =>
     import('./certificate-module/certificate-designer/certificate-designer').then(
       (m) => m.CertificateDesigner,

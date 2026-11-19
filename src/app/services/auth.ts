@@ -21,6 +21,10 @@ export const FEATURE = {
   ENROLLED_LIST: 'ENROLLMENT_ENROLLED_LIST',
   MULTIMEDIA: 'CONTENT_MGMT_MULTIMEDIA',
   EBOOK: 'CONTENT_MGMT_EBOOK',
+  /** read = open / list, update = edit profile + status, delete = delete users */
+  USER_ALL: 'USER_MGMT_ALL_USERS',
+  /** read = open the designer, update = save the template */
+  CERT_TEMPLATE: 'CERTIFICATE_MGMT_TEMPLATE',
 } as const;
 
 /**
@@ -32,6 +36,8 @@ export const MENU = {
   COURSE: 'COURSE_MGMT',
   CONTENT: 'CONTENT_MGMT',
   ENROLLMENT: 'ENROLLMENT',
+  USERS: 'USER_MGMT',
+  CERTIFICATE: 'CERTIFICATE_MGMT',
 } as const;
 
 export interface AuthUser {

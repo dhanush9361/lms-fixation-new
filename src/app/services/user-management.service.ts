@@ -1,4 +1,7 @@
-import { Injectable, signal } from '@angular/core';
+import { HttpClient, HttpParams } from '@angular/common/http';
+import { Injectable, inject, signal } from '@angular/core';
+import { Observable, map, tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export type UserStatus = 'Active' | 'Inactive' | 'Suspended';
 
@@ -8,37 +11,87 @@ export interface ManagedUser {
   role: string;
   email: string;
   status: UserStatus;
-  department: string;
-  suspendFrom?: string;
-  suspendTo?: string;
+  department: string | null;
+  suspendFrom?: string | null;
+  suspendTo?: string | null;
+}
+
+interface ApiResponse<T> {
+  success: boolean;
+  message: string;
+  data: T;
+}
+
+interface UserPage {
+  content: ManagedUser[];
+  page: number;
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 
 /**
- * Users list for the "All Users" page.
- * Sample data for now - when the backend endpoint is ready, replace the signal with an HttpClient
- * call (GET /api/users, PATCH /api/users/{id}/status, DELETE /api/users/{id}) and keep the same methods.
+ * Users list for the "All Users" page, backed by UserManagementController (/api/users).
+ * `users` stays a signal so the component template did not need to change.
  */
 @Injectable({ providedIn: 'root' })
 export class UserManagementService {
-  readonly users = signal<ManagedUser[]>(
-    Array.from({ length: 12 }, (_, i) => ({
-      id: i + 1,
-      username: 'John doe',
-      role: 'Learner',
-      email: 'sampleuser@gmail.com',
-      status: 'Active' as UserStatus,
-      department: 'Cyber security',
-    })),
-  );
+  private readonly http = inject(HttpClient);
+  private readonly apiUrl = `${environment.apiBaseUrl}/api/users`;
 
-  setStatus(id: number, status: UserStatus, suspendFrom?: string, suspendTo?: string): void {
-    this.users.update((list) =>
-      list.map((u) => (u.id === id ? { ...u, status, suspendFrom, suspendTo } : u)),
+  readonly users = signal<ManagedUser[]>([]);
+  readonly loading = signal(false);
+  /** Total rows on the server (can be more than `users().length` - the list is capped at 100 per request). */
+  readonly total = signal(0);
+
+  load(search = '', status: UserStatus | '' = ''): Observable<void> {
+    let params = new HttpParams().set('page', 0).set('size', 100);
+    if (search.trim()) params = params.set('search', search.trim());
+    if (status) params = params.set('status', status);
+
+    this.loading.set(true);
+    return this.http.get<ApiResponse<UserPage>>(this.apiUrl, { params }).pipe(
+      tap({
+        next: ({ data }) => {
+          this.users.set(data.content);
+          this.total.set(data.totalElements);
+          this.loading.set(false);
+        },
+        error: () => this.loading.set(false),
+      }),
+      map(() => undefined),
     );
   }
 
-  remove(ids: readonly number[]): void {
-    const gone = new Set(ids);
-    this.users.update((list) => list.filter((u) => !gone.has(u.id)));
+  setStatus(
+    id: number,
+    status: UserStatus,
+    suspendFrom?: string,
+    suspendTo?: string,
+  ): Observable<ManagedUser> {
+    const body = {
+      status,
+      suspendFrom: status === 'Suspended' && suspendFrom ? suspendFrom : null,
+      suspendTo: status === 'Suspended' && suspendTo ? suspendTo : null,
+    };
+    return this.http.patch<ApiResponse<ManagedUser>>(`${this.apiUrl}/${id}/status`, body).pipe(
+      map((res) => res.data),
+      tap((row) => this.users.update((list) => list.map((u) => (u.id === id ? row : u)))),
+    );
+  }
+
+  remove(ids: readonly number[]): Observable<void> {
+    const request =
+      ids.length === 1
+        ? this.http.delete<ApiResponse<void>>(`${this.apiUrl}/${ids[0]}`)
+        : this.http.post<ApiResponse<unknown>>(`${this.apiUrl}/bulk-delete`, { ids });
+    return request.pipe(
+      tap(() => {
+        const gone = new Set(ids);
+        this.users.update((list) => list.filter((u) => !gone.has(u.id)));
+        this.total.update((n) => Math.max(0, n - ids.length));
+      }),
+      map(() => undefined),
+    );
   }
 }

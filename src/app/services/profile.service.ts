@@ -17,6 +17,7 @@ export interface ProfileData {
   email: string;
   role: string;
   active: boolean;
+  department: string | null;
   organizationName: string | null;
   organizationAddress: string | null;
   personalAddress: string | null;
@@ -36,6 +37,8 @@ export interface ProfileUpdate {
   firstName: string;
   lastName: string;
   email: string;
+  /** Sent always; the server applies it only for an admin editing another user. */
+  department?: string;
   organizationName: string;
   organizationAddress: string;
   personalAddress: string;
@@ -53,34 +56,49 @@ export class ProfileService {
   private readonly http = inject(HttpClient);
   private readonly apiUrl = `${environment.apiBaseUrl}/api/profile`;
 
-  getMyProfile(): Observable<ProfileData> {
-    return this.http.get<ApiResponse<ProfileData>>(`${this.apiUrl}/me`).pipe(this.unwrap());
+  /**
+   * Every method takes an optional `userId`. Without it the call targets the logged-in user
+   * (/api/profile/me). With it (admin opening a row's "Edit Profile" in All Users) it targets
+   * /api/users/{id}/profile, which the backend limits to users of the admin's own company.
+   */
+  private base(userId?: number | null): string {
+    return userId == null ? `${this.apiUrl}/me` : `${environment.apiBaseUrl}/api/users/${userId}/profile`;
   }
 
-  updateMyProfile(payload: ProfileUpdate): Observable<ProfileData> {
-    return this.http.put<ApiResponse<ProfileData>>(`${this.apiUrl}/me`, payload).pipe(this.unwrap());
+  private pictureBase(userId?: number | null): string {
+    return userId == null ? `${this.apiUrl}/me/picture` : `${this.base(userId)}/picture`;
   }
 
-  uploadProfilePicture(file: File): Observable<ProfileData> {
+  private backgroundBase(userId?: number | null): string {
+    return userId == null ? `${this.apiUrl}/me/background-picture` : `${this.base(userId)}/background-picture`;
+  }
+
+  getMyProfile(userId?: number | null): Observable<ProfileData> {
+    return this.http.get<ApiResponse<ProfileData>>(this.base(userId)).pipe(this.unwrap());
+  }
+
+  updateMyProfile(payload: ProfileUpdate, userId?: number | null): Observable<ProfileData> {
+    return this.http.put<ApiResponse<ProfileData>>(this.base(userId), payload).pipe(this.unwrap());
+  }
+
+  uploadProfilePicture(file: File, userId?: number | null): Observable<ProfileData> {
     return this.http
-      .post<ApiResponse<ProfileData>>(`${this.apiUrl}/me/picture`, this.toFormData(file))
+      .post<ApiResponse<ProfileData>>(this.pictureBase(userId), this.toFormData(file))
       .pipe(this.unwrap());
   }
 
-  uploadBackgroundPicture(file: File): Observable<ProfileData> {
+  uploadBackgroundPicture(file: File, userId?: number | null): Observable<ProfileData> {
     return this.http
-      .post<ApiResponse<ProfileData>>(`${this.apiUrl}/me/background-picture`, this.toFormData(file))
+      .post<ApiResponse<ProfileData>>(this.backgroundBase(userId), this.toFormData(file))
       .pipe(this.unwrap());
   }
 
-  removeProfilePicture(): Observable<ProfileData> {
-    return this.http.delete<ApiResponse<ProfileData>>(`${this.apiUrl}/me/picture`).pipe(this.unwrap());
+  removeProfilePicture(userId?: number | null): Observable<ProfileData> {
+    return this.http.delete<ApiResponse<ProfileData>>(this.pictureBase(userId)).pipe(this.unwrap());
   }
 
-  removeBackgroundPicture(): Observable<ProfileData> {
-    return this.http
-      .delete<ApiResponse<ProfileData>>(`${this.apiUrl}/me/background-picture`)
-      .pipe(this.unwrap());
+  removeBackgroundPicture(userId?: number | null): Observable<ProfileData> {
+    return this.http.delete<ApiResponse<ProfileData>>(this.backgroundBase(userId)).pipe(this.unwrap());
   }
 
   /** Backend stores relative paths (/uploads/profile/x.jpg); make them absolute for <img [src]>. */
