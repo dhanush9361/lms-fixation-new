@@ -33,6 +33,12 @@ import { MultimediaManagementService } from '../../services/multimedia-managemen
 import { MultimediaResource, MultimediaSaveResult } from '../multimedia.model';
 import { QuestionBankService, toUiError } from '../../services/question-bank.service';
 import { ApiBankResponse } from '../question-bank.model';
+import {
+  activityOrderKey,
+  applyActivityOrder,
+  readActivityOrder,
+  writeActivityOrder,
+} from '../activity-order';
 
 // Must match SectionService.validateAndNormalizeName on the backend.
 const MIN_CHARS = 3;
@@ -195,15 +201,22 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
   private readonly banksBySection = signal<ReadonlyMap<number, ApiBankResponse[]>>(new Map());
   /** Blocks double clicks on Add Activity -> Question Bank while the bank is being created. */
   private readonly bankCreating = signal(false);
-  /** Ebook rows first, then multimedia, then question banks - shaped for the activity rows in the template. */
+  /** Custom (dragged) order of the Ebook + Multimedia rows per section, as "Kind:id" keys. Question Banks are never in it. */
+  private readonly activityOrderBySection = signal<ReadonlyMap<number, string[]>>(new Map());
+  /**
+   * Default: Ebook rows, then multimedia, then question banks (always last).
+   * Ebook + Multimedia rows can be re-ordered with drag & drop (activityOrderBySection);
+   * Question Banks stay after them whatever the custom order is.
+   */
   private readonly activitiesBySection = computed(() => {
     const ebooks = this.ebooksBySection();
     const resources = this.resourcesBySection();
     const banks = this.banksBySection();
+    const customOrder = this.activityOrderBySection();
     const map = new Map<number, SectionActivity[]>();
     const sectionIds = new Set<number>([...ebooks.keys(), ...resources.keys(), ...banks.keys()]);
     for (const sectionId of sectionIds) {
-      map.set(sectionId, [
+      let content: SectionActivity[] = [
         ...(ebooks.get(sectionId) ?? []).map(e => ({
           id: e.id,
           kind: 'Ebook' as const,
@@ -214,6 +227,15 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
           kind: 'Multimedia' as const,
           title: r.name,
         })),
+      ];
+      // rows missing from the saved order (newly added) go after the known ones, in default order
+      content = applyActivityOrder(
+        content,
+        a => this.activityKey(a),
+        customOrder.get(sectionId) ?? readActivityOrder(sectionId),
+      );
+      map.set(sectionId, [
+        ...content,
         ...(banks.get(sectionId) ?? []).map(b => ({
           id: b.id,
           kind: 'Question Bank' as const,
@@ -223,6 +245,16 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
     }
     return map;
   });
+
+  private activityKey(activity: SectionActivity): string {
+    return activityOrderKey(activity.kind, activity.id);
+  }
+
+  /** Remembers the dragged order (shared with the course preview through activity-order.ts). */
+  private saveActivityOrder(sectionId: number, keys: string[]): void {
+    this.activityOrderBySection.update(map => new Map(map).set(sectionId, keys));
+    writeActivityOrder(sectionId, keys);
+  }
   /** Open upload / edit dialog: null = closed, resource = null means "new upload". */
   readonly resourceDialog = signal<{ sectionId: number; resource: MultimediaResource | null } | null>(
     null,
@@ -1014,32 +1046,41 @@ export class OrganizeSections implements OnInit, AfterViewInit, OnDestroy {
 
   /**
    * Moves an activity row inside its section (local order only).
-   * Multimedia rows are listed first, then Question Banks, so each kind is reordered within its own group:
-   * dropping a bank on a multimedia row puts it at the top of the banks.
-   * TODO: call the backend reorder endpoint here once it exists, otherwise the order resets
-   * when the section is collapsed / expanded (loadResources re-fetches the server order).
+   * Ebook and Multimedia rows form one group that can be dragged in any order (Ebook before Multimedia
+   * or the other way round); the custom order is kept in activityOrderBySection / localStorage.
+   * Question Banks are always after them: dropping an Ebook / Multimedia row on a Question Bank row (or on
+   * the Add Activity button) puts it at the end of its own group, and a Question Bank only moves among banks.
+   * TODO: call a backend reorder endpoint here once it exists (none for Ebook / Multimedia yet), so the
+   * order is shared between browsers instead of living in this browser's localStorage.
    */
   private moveActivity(sectionId: number, from: number, to: number): void {
-    const resources = [...(this.resourcesBySection().get(sectionId) ?? [])];
-    const banks = [...(this.banksBySection().get(sectionId) ?? [])];
+    const all = this.activitiesForSection(sectionId);
+    const moving = all[from];
+    if (!moving) return;
 
-    // Multimedia row
-    if (from >= 0 && from < resources.length) {
-      if (from === to) return;
-      const [moved] = resources.splice(from, 1);
-      resources.splice(Math.min(to, resources.length), 0, moved);
-      this.resourcesBySection.update(map => new Map(map).set(sectionId, resources));
+    // Question Bank row: reorder inside the banks only (they are contiguous and last)
+    if (moving.kind === 'Question Bank') {
+      const banks = [...(this.banksBySection().get(sectionId) ?? [])];
+      const firstBank = all.findIndex(a => a.kind === 'Question Bank');
+      const bankFrom = from - firstBank;
+      const bankTo = Math.max(0, Math.min(to - firstBank, banks.length));
+      if (bankFrom === bankTo) return;
+      const [movedBank] = banks.splice(bankFrom, 1);
+      banks.splice(Math.min(bankTo, banks.length), 0, movedBank);
+      this.banksBySection.update(map => new Map(map).set(sectionId, banks));
       return;
     }
 
-    // Question Bank row
-    const bankFrom = from - resources.length;
-    if (bankFrom < 0 || bankFrom >= banks.length) return;
-    const bankTo = Math.max(0, Math.min(to - resources.length, banks.length));
-    if (bankFrom === bankTo) return;
-    const [moved] = banks.splice(bankFrom, 1);
-    banks.splice(Math.min(bankTo, banks.length), 0, moved);
-    this.banksBySection.update(map => new Map(map).set(sectionId, banks));
+    // Ebook / Multimedia row: reorder inside the Ebook + Multimedia group, never past a Question Bank
+    const content = all.filter(a => a.kind !== 'Question Bank');
+    const target = Math.max(0, Math.min(to, content.length));
+    if (from === target) return;
+    const [moved] = content.splice(from, 1);
+    content.splice(Math.min(target, content.length), 0, moved);
+    this.saveActivityOrder(
+      sectionId,
+      content.map(a => this.activityKey(a)),
+    );
   }
 
   // =====================================================================

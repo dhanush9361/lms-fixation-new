@@ -34,6 +34,7 @@ import { QuizAttemptPage } from '../quiz-attempt/quiz-attempt'; // adjust the pa
 import { EbookSummary } from '../ebook/ebook-api.model';
 import { Section as EbookPage } from '../ebook/models';
 import { EbookReader } from '../ebook/ebook-reader/ebook-reader';
+import { activityOrderKey, applyActivityOrder, readActivityOrder } from '../activity-order';
 
 type ViewMode = 'desktop' | 'tablet' | 'mobile';
 type TabKind = 'Ebook' | 'Multimedia' | 'Question Bank';
@@ -427,21 +428,29 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(({ ebooks, resources, banks }) => {
+        // Ebook + Multimedia: default order (ebooks first), or the order dragged on the Organize screen.
+        const content: ContentTab[] = applyActivityOrder<ContentTab>(
+          [
+            ...ebooks.map(e => ({
+              key: `eb-${e.id}`,
+              label: e.name,
+              kind: 'Ebook' as const,
+              addedAt: this.timeOf(e.createdAt),
+              ebookId: e.id,
+            })),
+            ...resources.map(r => ({
+              key: `mm-${r.id}`,
+              label: r.name,
+              kind: 'Multimedia' as const,
+              addedAt: this.timeOf(r.createdAt),
+              resource: r,
+            })),
+          ],
+          tab => activityOrderKey(tab.kind, tab.kind === 'Ebook' ? (tab.ebookId ?? 0) : (tab.resource?.id ?? 0)),
+          readActivityOrder(sectionId),
+        );
         const items: ContentTab[] = [
-          ...ebooks.map(e => ({
-            key: `eb-${e.id}`,
-            label: e.name,
-            kind: 'Ebook' as const,
-            addedAt: this.timeOf(e.createdAt),
-            ebookId: e.id,
-          })),
-          ...resources.map(r => ({
-            key: `mm-${r.id}`,
-            label: r.name,
-            kind: 'Multimedia' as const,
-            addedAt: this.timeOf(r.createdAt),
-            resource: r,
-          })),
+          ...content,
           ...[...banks].sort((x, y) => x.bankOrder - y.bankOrder).map(b => ({
             key: `qb-${b.id}`,
             label: b.name,
@@ -450,7 +459,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
             bankId: b.id,
           })),
         ];
-        // Same order as the Organize screen: ebooks first, then multimedia rows (oldest first), then question banks.
+        // Same order as the Organize screen: Ebook / Multimedia rows (default ebooks first, or the dragged order), then question banks last.
         this.tabs.set(items);
         this.activeTabKey.set(items[0]?.key ?? '');
         this.loading.set(false);
