@@ -153,6 +153,19 @@ export interface MyBilling {
   vatNumber: string | null;
 }
 
+/** Body of PUT /api/packages/my-billing (Manage Details -> Billing Details -> Edit). */
+export interface UpdateMyBillingPayload {
+  billingName: string;
+  companyName: string;
+  email: string;
+  address: string;
+  city: string;
+  state: string;
+  postalCode: string;
+  country: string;
+  vatNumber: string;
+}
+
 /** Body of POST /api/packages/purchase. Card data is only validated by the server, never stored. */
 export interface PackagePurchasePayload {
   packageId: number;
@@ -261,6 +274,11 @@ export class PackageService {
   /** Billing details the logged-in admin entered when subscribing (Manage Details -> Billing Details). */
   getMyBilling(): Observable<MyBilling> {
     return this.http.get<MyBilling>(`${this.baseUrl}/my-billing`);
+  }
+
+  /** Saves the billing details the admin edited in Manage Details. Returns what the server stored. */
+  updateMyBilling(payload: UpdateMyBillingPayload): Observable<MyBilling> {
+    return this.http.put<MyBilling>(`${this.baseUrl}/my-billing`, payload);
   }
 
   /** Removes the package from one admin (Super Admin only). */

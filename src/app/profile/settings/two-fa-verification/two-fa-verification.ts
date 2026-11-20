@@ -85,7 +85,8 @@ export class TwoFaVerification implements OnDestroy {
 
   /** Which slide is showing: 1) pick a method  2) scan the QR code (authenticator only)  3) enter the code. */
   readonly step = signal<Step>('method');
-  readonly selected = signal<TwoFaMethod>('email');
+  /** No method is preselected; the user must choose one before continuing. */
+  readonly selected = signal<TwoFaMethod | null>(null);
 
   readonly otp = signal('');
   readonly verified = signal(false);
@@ -145,7 +146,14 @@ export class TwoFaVerification implements OnDestroy {
     this.closing.set(false);
     this.dialogOpen.set(true);
     // Move focus into the dialog once it has rendered (keyboard / screen reader users).
-    setTimeout(() => this.panel()?.nativeElement.focus(), 0);
+    setTimeout(() => {
+      const panel = this.panel()?.nativeElement;
+      panel?.focus();
+      // The existing template uses a fixed title; set its text for the enable flow
+      // without changing the popup markup or its styling.
+      const title = panel?.querySelector<HTMLElement>('[aria-labelledby="tfa-title"] h3, #tfa-title');
+      if (title) title.textContent = this.mode() === 'enable' ? 'Email Verification' : 'Verification';
+    }, 0);
 
     if (this.mode() === 'disable') {
       this.step.set('otp');
@@ -165,7 +173,13 @@ export class TwoFaVerification implements OnDestroy {
   next(): void {
     if (this.busy()) return;
 
-    if (this.selected() === 'google') {
+    const method = this.selected();
+    if (!method) {
+      this.error.set('Please select a verification method to continue.');
+      return;
+    }
+
+    if (method === 'google') {
       this.startAuthenticatorSetup();
       return;
     }
@@ -302,7 +316,7 @@ export class TwoFaVerification implements OnDestroy {
 
   private resetDialog(): void {
     this.step.set('method');
-    this.selected.set('email');
+    this.selected.set(null);
     this.qrDataUrl.set('');
     this.manualKey.set('');
     this.otp.set('');

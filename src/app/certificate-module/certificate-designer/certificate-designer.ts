@@ -15,7 +15,6 @@ import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
 import { DomSanitizer, SafeUrl } from '@angular/platform-browser';
 import { map, startWith } from 'rxjs';
 
-import { AuthService, FEATURE } from '../../services/auth';
 import { CertificateTemplateService } from '../../services/certificate-template.service';
 import {
   CERTIFICATE_ACCENTS,
@@ -30,9 +29,6 @@ import {
   CertificateTagKey,
   CertificateTemplate,
   DEFAULT_CERTIFICATE_TEMPLATE,
-  findMissingRequiredTags,
-  findUnknownTags,
-  templateTexts,
   tokenize,
 } from '../certificate.model';
 
@@ -86,9 +82,6 @@ const MAX_IMAGE_WIDTH: Record<ImageKind, number> = {
 export class CertificateDesigner {
   private readonly fb = inject(FormBuilder);
   private readonly store = inject(CertificateTemplateService);
-  private readonly auth = inject(AuthService);
-  /** Package / role permission: read = open the designer, update = save the template. */
-  readonly canSave = computed(() => this.auth.can(FEATURE.CERT_TEMPLATE, 'update'));
   private readonly destroyRef = inject(DestroyRef);
   private readonly sanitizer = inject(DomSanitizer);
 
@@ -222,12 +215,6 @@ export class CertificateDesigner {
   /** Tailwind justify class that puts the logo on the left, centre or right. */
   readonly logoJustify = computed(() => LOGO_JUSTIFY[this.value().logoPosition] ?? LOGO_JUSTIFY.center);
 
-  readonly missingTags = computed(() => findMissingRequiredTags(this.template()));
-  readonly unknownTags = computed(() => {
-    const found = templateTexts(this.template()).flatMap((text) => findUnknownTags(text));
-    return [...new Set(found)];
-  });
-
   private readonly sampleValues = computed<Record<CertificateTagKey, string>>(() => {
     const v = this.value();
     // Nothing is pre-filled: what the admin types is shown, an empty field shows the tag's name.
@@ -335,11 +322,15 @@ export class CertificateDesigner {
     const element = event.target as HTMLInputElement | HTMLTextAreaElement;
     this.activeControl.set(name);
     this.activeElement = element;
-    this.caret = { start: element.selectionStart ?? element.value.length, end: element.selectionEnd ?? element.value.length };
+    this.caret = {
+      start: element.selectionStart ?? element.value.length,
+      end: element.selectionEnd ?? element.value.length,
+    };
   }
 
   insertTag(tag: CertificateTagDef): void {
     const name = this.activeControl();
+    if (name === 'title') return;
     const control = this.form.controls[name];
     const text = control.value;
     const marker = `{{${tag.key}}}`;
@@ -356,6 +347,77 @@ export class CertificateDesigner {
       element.focus();
       element.setSelectionRange(position, position);
     }
+  }
+
+  // ---------- input restrictions (English letters and spaces only) ----------
+
+  /** Title: English letters and spaces only (no tags are allowed in the title). */
+  restrictTitle(event: Event): void {
+    this.restrictEnglish('title', event, false);
+  }
+
+  /** Subtitle: English letters and spaces only, but {{tags}} are kept. */
+  restrictSubtitle(event: Event): void {
+    this.restrictEnglish('subtitle', event, true);
+  }
+
+  private restrictEnglish(name: 'title' | 'subtitle', event: Event, keepTags: boolean): void {
+    const input = event.target as HTMLInputElement;
+    const value = input.value;
+    const cursor = input.selectionStart ?? value.length;
+
+    const filtered = this.filterEnglish(value, keepTags);
+    if (filtered === value) return;
+
+    const filteredCursor = Math.min(this.filterEnglish(value.slice(0, cursor), keepTags).length, filtered.length);
+
+    input.value = filtered;
+    this.form.controls[name].setValue(filtered);
+    this.form.controls[name].markAsDirty();
+    input.setSelectionRange(filteredCursor, filteredCursor);
+  }
+
+  private filterEnglish(value: string, keepTags: boolean): string {
+    const clean = (text: string) => text.replace(/[^a-zA-Z ]/g, '');
+    if (!keepTags) {
+      return clean(value).replace(/ {2,}/g, ' ');
+    }
+    // split() with a capture group puts the tags at the odd indexes: keep them, clean the rest.
+    return value
+      .split(/(\{\{[a-z_]+\}\})/g)
+      .map((part, index) => (index % 2 === 1 ? part : clean(part)))
+      .join('')
+      .replace(/ {2,}/g, ' ');
+  }
+
+  /** Main text: the first line (the learner name line) may only have English letters, spaces and the learner_name tag. */
+  restrictLearnerName(event: Event): void {
+    const textarea = event.target as HTMLTextAreaElement;
+    const value = textarea.value;
+    const firstLineEnd = value.indexOf('\n');
+    const lineEnd = firstLineEnd === -1 ? value.length : firstLineEnd;
+    const firstLine = value.slice(0, lineEnd);
+    const filteredFirstLine = this.filterLearnerName(firstLine);
+    if (filteredFirstLine === firstLine) return;
+
+    const selectionStart = textarea.selectionStart ?? value.length;
+    const filteredPrefix =
+      selectionStart <= lineEnd
+        ? this.filterLearnerName(firstLine.slice(0, selectionStart))
+        : filteredFirstLine + value.slice(lineEnd, selectionStart);
+    const filteredValue = filteredFirstLine + value.slice(lineEnd);
+
+    textarea.value = filteredValue;
+    this.form.controls.body.setValue(filteredValue);
+    this.form.controls.body.markAsDirty();
+    textarea.setSelectionRange(filteredPrefix.length, filteredPrefix.length);
+  }
+
+  private filterLearnerName(value: string): string {
+    return value
+      .replace(/\{\{learner_name\}\}/gi, '\u0000')
+      .replace(/[^a-z ]/gi, '')
+      .replace(/\u0000/g, '{{learner_name}}');
   }
 
   // ---------- images ----------
@@ -504,17 +566,17 @@ export class CertificateDesigner {
   // ---------- save ----------
 
   save(): void {
-    if (this.saving() || this.loading() || this.loadError() || !this.canSave()) return;
-    const missing = this.missingTags();
-    if (missing.length) {
-      this.flash('error', `Add the ${missing.map((t) => t.label).join(' and ')} tag before saving.`);
+    if (this.saving() || this.loading() || this.loadError()) return;
+
+    // The title may only have English letters and spaces.
+    const title = this.form.controls.title.value.trim();
+    if (!/^[A-Za-z ]+$/.test(title)) {
+      this.flash('error', 'Title must contain English letters only.');
       return;
     }
-    if (this.unknownTags().length) {
-      this.flash('error', `Fix the unknown tag ${this.unknownTags()[0]} before saving.`);
-      return;
-    }
+
     this.saving.set(true);
+
     this.store
       .save(this.template())
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -522,7 +584,7 @@ export class CertificateDesigner {
         next: () => {
           this.saving.set(false);
           this.form.markAsPristine();
-          this.flash('success', 'Certificate template saved.');
+          this.flash('success', 'Certificate Template Saved Successfully!');
         },
         error: (error) => {
           this.saving.set(false);

@@ -23,14 +23,14 @@
   <!-- Reusable renderer: plain text + tags. Design mode shows tags as chips, Preview mode shows sample data. -->
   <ng-template #rich let-segments>
     @for (segment of segments; track $index) {
-      @if (segment.tag; as tag) {
+      @if (segment.tag) {
         @if (previewing()) {
-          <span [class]="emphasis(tag.key)">{{ sampleValue(tag.key) }}</span>
+          <span [class]="emphasis(segment.tag.key)">{{ sampleValue(segment.tag.key) }}</span>
         } @else {
           <span
-            [class]="emphasis(tag.key)"
+            [class]="emphasis(segment.tag.key)"
             class="rounded-[0.6cqw] bg-[#e3f3f6] px-[0.8cqw] text-[#1f5f6c] outline-1 outline-dashed outline-[#2f7684]"
-            [title]="tag.hint">{{ tag.label }}</span>
+            [title]="segment.tag.hint">{{ segment.tag.label }}</span>
         }
       } @else {
         <span>{{ segment.text }}</span>
@@ -75,8 +75,7 @@
         <button
           type="button"
           (click)="save()"
-          [disabled]="saving() || loading() || !!loadError() || !canSave()"
-          [attr.title]="canSave() ? null : 'You do not have permission to save the template'"
+          [disabled]="saving() || loading() || !!loadError()"
           class="rounded-full bg-[#2f7684] px-6 py-2 text-xs font-semibold text-white outline-none transition hover:bg-[#276371] focus-visible:ring-2 focus-visible:ring-[#2f7684] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60">
           {{ saving() ? 'Saving…' : 'Save template' }}
         </button>
@@ -109,8 +108,8 @@
 
             <!-- Organization logo: left / center / right -->
             <div class="flex h-[9cqw] w-full items-center" [class]="logoJustify()">
-              @if (logoSrc(); as src) {
-                <img [src]="src" alt="Organization logo" class="max-h-full max-w-[26cqw] object-contain" />
+              @if (logoSrc()) {
+                <img [src]="logoSrc()!" alt="Organization logo" class="max-h-full max-w-[26cqw] object-contain" />
               } @else if (!previewing()) {
                 <span class="rounded-[0.8cqw] border border-dashed border-[#767676] px-[2cqw] py-[1cqw] text-[1.3cqw] text-[#595959]">
                   Organization logo
@@ -152,8 +151,8 @@
 
               <div class="flex flex-col items-center">
                 <div class="flex min-h-[7cqw] w-full items-end justify-center border-b border-[#555555] pb-[0.6cqw]">
-                  @if (signatureSrc(); as sig) {
-                    <img [src]="sig" alt="Signature" class="max-h-[6.5cqw] max-w-full object-contain" />
+                  @if (signatureSrc()) {
+                    <img [src]="signatureSrc()!" alt="Signature" class="max-h-[6.5cqw] max-w-full object-contain" />
                   } @else if (!previewing()) {
                     <span class="text-[1.2cqw] text-[#595959]">Signature</span>
                   }
@@ -170,16 +169,6 @@
         </div>
         </div>
 
-        @if (missingTags().length || unknownTags().length) {
-        <ul class="mx-auto mt-4 max-w-[1000px] space-y-1 rounded-xl bg-red-50 px-4 py-3 text-xs text-red-800" role="alert">
-          @for (tag of missingTags(); track tag.key) {
-            <li>The <strong>{{ tag.label }}</strong> tag is missing. Add it from “Insert a tag” so the certificate shows the {{ tag.hint.toLowerCase() }}.</li>
-          }
-          @for (name of unknownTags(); track name) {
-            <li><strong>{{ name }}</strong> is not a known tag. Check the spelling or pick a tag from the list.</li>
-          }
-        </ul>
-        } @else {
         <p class="mx-auto mt-2 max-w-[1000px] text-xs text-[#595959]">
           @if (previewing()) {
             Preview uses sample data. Each learner's real name, course and date fill in automatically when the certificate is generated.
@@ -187,7 +176,6 @@
             Highlighted chips are tags. They are replaced by each learner's real details when the certificate is generated.
           }
         </p>
-        }
       </section>
 
       <!-- ================= Controls (only this column scrolls) ================= -->
@@ -218,21 +206,42 @@
 
           <div class="clear-both">
             <label for="cert-title" class="mb-1 block text-xs font-semibold">Title</label>
-            <input id="cert-title" type="text" formControlName="title" autocomplete="off"
-              (focus)="rememberField('title', $event)" (blur)="rememberField('title', $event)"
+            <input
+              id="cert-title"
+              type="text"
+              formControlName="title"
+              autocomplete="off"
+              (input)="restrictTitle($event)"
+              (focus)="rememberField('title', $event)"
+              (blur)="rememberField('title', $event)"
               class="w-full rounded-lg border border-[#767676] bg-white px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[#2f7684]" />
+            <p class="mt-1 text-[11px] text-[#595959]">
+              Only English letters and spaces are allowed.
+            </p>
           </div>
           <div>
             <label for="cert-subtitle" class="mb-1 block text-xs font-semibold">Subtitle</label>
-            <input id="cert-subtitle" type="text" formControlName="subtitle" autocomplete="off"
-              (focus)="rememberField('subtitle', $event)" (blur)="rememberField('subtitle', $event)"
+            <input
+              id="cert-subtitle"
+              type="text"
+              formControlName="subtitle"
+              autocomplete="off"
+              (input)="restrictSubtitle($event)"
+              (focus)="rememberField('subtitle', $event)"
+              (blur)="rememberField('subtitle', $event)"
               class="w-full rounded-lg border border-[#767676] bg-white px-3 py-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[#2f7684]" />
           </div>
           <div>
             <label for="cert-body" class="mb-1 block text-xs font-semibold">Main text (one line per row)</label>
-            <textarea id="cert-body" rows="6" formControlName="body"
-              (focus)="rememberField('body', $event)" (blur)="rememberField('body', $event)"
+            <textarea
+              id="cert-body"
+              rows="6"
+              formControlName="body"
+              (focus)="rememberField('body', $event)"
+              (blur)="rememberField('body', $event)"
+              (input)="restrictLearnerName($event)"
               class="w-full resize-y rounded-lg border border-[#767676] bg-white px-3 py-2 text-xs leading-relaxed outline-none focus-visible:ring-2 focus-visible:ring-[#2f7684]"></textarea>
+            <p class="mt-1 text-[11px] text-[#595959]">Use English letters and spaces for the learner name on the first line.</p>
           </div>
           <div>
             <label for="cert-footer-note" class="mb-1 block text-xs font-semibold">Footer note</label>

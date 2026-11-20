@@ -7,36 +7,149 @@
         <span class="text-[13px] text-[#555]">Welcome Back</span>
       </div>
 
-      <div class="relative">
-        <select
-          [value]="selectedPeriod"
-          (change)="onPeriodChange($event)"
-          aria-label="Select time period"
-          class="cursor-pointer appearance-none rounded-full border-0 bg-white py-2.5 pl-5 pr-10 text-xs text-[#555] outline-none focus:ring-2 focus:ring-[#60b9c9]"
+      <div class="flex flex-wrap items-center gap-2">
+        <div
+          class="relative z-30 h-10 w-40"
+          (click)="$event.stopPropagation()"
         >
-          <option value="" disabled>Time Period</option>
-          @for (period of timePeriods; track period) {
-            <option [value]="period">{{ period }}</option>
+          <div
+            class="dd-clip"
+            [class.dd-open]="openPeriodDropdown()"
+            [class.dd-closing]="periodDropdownUsed() && !openPeriodDropdown()"
+            [attr.inert]="openPeriodDropdown() ? null : ''"
+            [attr.aria-hidden]="!openPeriodDropdown()"
+            role="menu"
+          >
+            <div class="dd-panel">
+              <div class="dd-spacer" aria-hidden="true"></div>
+              <div class="admin-dashboard-date-options">
+                @for (period of timePeriods; track period; let i = $index) {
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class="dd-item"
+                    [style.--i]="i"
+                    [style.--r]="timePeriods.length - 1 - i"
+                    [class.font-semibold]="selectedPeriod === period"
+                    (click)="selectPeriod(period)"
+                  >
+                    {{ period }}
+                  </button>
+                }
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            class="relative z-10 flex h-10 w-40 cursor-pointer items-center justify-center gap-2 rounded-[20px] border-0 bg-white px-4 text-xs font-medium text-[#555] outline-none transition focus-visible:ring-2 focus-visible:ring-[#62b9c8]/40"
+            [class]="openPeriodDropdown()
+              ? 'shadow-[0_8px_10px_-4px_rgba(0,0,0,.35)]'
+              : 'shadow-sm hover:shadow-md'"
+            [attr.aria-label]="'Time Period: ' + selectedPeriodLabel"
+            aria-haspopup="menu"
+            [attr.aria-expanded]="openPeriodDropdown()"
+            (click)="togglePeriodDropdown()"
+          >
+            <span class="truncate">{{ selectedPeriodLabel }}</span>
+            <svg viewBox="0 0 24 24" class="h-4 w-4 shrink-0 fill-none stroke-[#555]" stroke-width="2.2" aria-hidden="true">
+              <path d="m6 9 6 6 6-6" stroke-linecap="round" stroke-linejoin="round"></path>
+            </svg>
+          </button>
+
+          @if (customDatePickerOpen()) {
+            <section
+              class="absolute right-0 top-full z-40 mt-2 w-72 rounded-2xl border border-[#eeeeee] bg-white p-4 text-xs text-[#555] shadow-[0_8px_18px_rgba(0,0,0,.14)]"
+              aria-label="Custom date range"
+              (click)="$event.stopPropagation()"
+            >
+              <label class="mb-3 grid gap-1.5" for="admin-dashboard-start-date">
+                <span>Start Date</span>
+                <input
+                  id="admin-dashboard-start-date"
+                  type="date"
+                  [value]="draftFromDate()"
+                  [attr.max]="draftToDate() || null"
+                  [attr.aria-describedby]="!canApplyCustomDateRange ? 'admin-dashboard-date-help' : null"
+                  (change)="onFromDateChange($event)"
+                  class="h-9 min-w-0 rounded-lg border border-[#e5e5e5] bg-white px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[#60b9c9]"
+                />
+              </label>
+              <label class="grid gap-1.5" for="admin-dashboard-end-date">
+                <span>End Date</span>
+                <input
+                  id="admin-dashboard-end-date"
+                  type="date"
+                  [value]="draftToDate()"
+                  [attr.min]="draftFromDate() || null"
+                  [attr.aria-describedby]="!canApplyCustomDateRange ? 'admin-dashboard-date-help' : null"
+                  (change)="onToDateChange($event)"
+                  class="h-9 min-w-0 rounded-lg border border-[#e5e5e5] bg-white px-2 text-xs outline-none focus-visible:ring-2 focus-visible:ring-[#60b9c9]"
+                />
+              </label>
+              @if (customDateRangeError) {
+                <p class="mt-2 text-red-600" id="admin-dashboard-date-help" role="alert">
+                  {{ customDateRangeError }}
+                </p>
+              }
+              @if (!canApplyCustomDateRange && !customDateRangeError) {
+                <p class="mt-2 text-neutral-500" id="admin-dashboard-date-help">
+                  Choose both dates to apply this range.
+                </p>
+              }
+              <div class="mt-4 flex justify-end gap-2">
+                <button
+                  type="button"
+                  class="rounded-full px-3 py-2 text-xs text-[#555] transition hover:bg-[#f5f5f5] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60b9c9]"
+                  (click)="cancelCustomDateRange()"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  class="rounded-full bg-[#60b9c9] px-4 py-2 text-xs text-white transition hover:bg-[#4da8b8] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#60b9c9] focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  [disabled]="!canApplyCustomDateRange"
+                  (click)="applyCustomDateRange()"
+                >
+                  Apply
+                </button>
+              </div>
+            </section>
           }
-        </select>
-        <svg
-          class="pointer-events-none absolute right-4 top-1/2 size-3 -translate-y-1/2 text-[#555]"
-          viewBox="0 0 12 12"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M3 4.5 6 7.5 9 4.5" />
-        </svg>
+        </div>
       </div>
     </section>
 
     <div
       class="relative z-[1] min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 [scrollbar-color:transparent_transparent] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
+    
+@if (dashboardStatus === 'error' || dashboardStatus === 'offline' || dashboardStatus === 'invalid-range') {
+  <div
+    class="mb-3 flex flex-wrap items-center justify-center gap-3 text-center text-xs"
+    role="alert"
+  >
+    <span class="text-red-600">{{ dashboardStateMessage }}</span>
+
+    @if (canRetryDashboardLoad) {
+      <button
+        type="button"
+        (click)="retryDashboardLoad()"
+        class="rounded-full bg-[#60b9c9] px-4 py-2 text-xs text-white focus:outline-none focus:ring-2 focus:ring-[#60b9c9] focus:ring-offset-2"
+      >
+        Try again
+      </button>
+    }
+  </div>
+}
+
+      
+      @if (dateFilterNotice) {
+        <p class="mb-3 text-center text-xs text-[#777]" role="status">
+          {{ dateFilterNotice }}
+        </p>
+      }
+
       <!-- Top charts -->
       <section class="relative z-10 grid grid-cols-1 gap-3.5 lg:grid-cols-2">
         <!-- Logins & Sign ups -->
@@ -157,9 +270,10 @@
 
             @if (!hasChartData('logins') && !hasChartData('newSignups')) {
               <div
-                class="absolute inset-0 flex items-center justify-center bg-white/80 text-sm text-gray-400"
+                class="absolute inset-0 flex items-center justify-center text-sm text-gray-400"
+                [attr.role]="dashboardStatus === 'loading' ? 'status' : null"
               >
-                No chart data available
+                {{ dashboardStatus === 'loading' ? 'Updating dashboard…' : 'No chart data available' }}
               </div>
             }
           </div>
@@ -236,9 +350,10 @@
 
             @if (!hasChartData('revenue')) {
               <div
-                class="absolute inset-0 flex items-center justify-center bg-white/80 text-sm text-gray-400"
+                class="absolute inset-0 flex items-center justify-center text-sm text-gray-400"
+                [attr.role]="dashboardStatus === 'loading' ? 'status' : null"
               >
-                No revenue chart data available
+                {{ dashboardStatus === 'loading' ? 'Updating dashboard…' : 'No revenue chart data available' }}
               </div>
             }
           </div>
@@ -279,50 +394,59 @@
 
             @if (!hasUserDistribution) {
               <div class="absolute inset-0 flex items-center justify-center text-sm text-gray-400">
-                No user data
+                {{ dashboardStatus === 'loading' ? 'Updating dashboard…' : summaryUnavailableMessage || 'No user data' }}
               </div>
             }
           </div>
         </div>
 
         <!-- Role percentages -->
-<div class="flex h-full flex-col gap-3.5">
-  @for (role of roles; track role.key; let i = $index) {
-    <div
-      class="flex min-h-[78px] flex-1 animate-stat-enter-up items-center justify-between rounded-[20px] bg-white pr-5 motion-reduce:animate-none"
-      [style.animation-delay]="180 + i * 50 + 'ms'"
-    >
-      <div class="flex items-center gap-5">
-        <span class="h-9 w-[3px] rounded-full {{ role.bar }}"></span>
-        <span class="text-[13px]">{{ role.label }}</span>
-      </div>
-      <span class="text-xl font-light">{{ getRolePercentage(role.key) }}</span>
-    </div>
-  }
-</div>
+        <div class="flex h-full flex-col gap-3.5">
+          @for (role of roles; track role.key; let i = $index) {
+            <div
+              class="flex min-h-[78px] flex-1 animate-stat-enter-up items-center justify-between rounded-[20px] bg-white pr-5 motion-reduce:animate-none"
+              [style.animation-delay]="180 + i * 50 + 'ms'"
+            >
+              <div class="flex items-center gap-5">
+                <span class="h-9 w-[3px] rounded-full {{ role.bar }}"></span>
+                <span class="text-[13px]"
+                  >{{ role.label }}
+                  <span class="ml-1 text-[11px] text-gray-400">({{ getRoleCount(role.key) }})</span>
+                </span>
+              </div>
+              <span class="text-xl font-light">{{ getRolePercentage(role.key) }}</span>
+            </div>
+          }
+        </div>
 
         <!-- Additional statistics -->
         <div
           class="flex min-h-[280px] animate-stat-enter-up flex-wrap items-center justify-center gap-7 rounded-[20px] bg-white p-5 [animation-delay:320ms] motion-reduce:animate-none sm:col-span-2 lg:col-span-1"
         >
           <div class="relative h-[225px] w-[255px] shrink-0" aria-hidden="true">
-            @if (dashboardData) {
+            @if (hasCourseCompletionRate) {
               <span
                 class="bubble absolute left-0 top-0 grid size-[110px] place-items-center rounded-full bg-[#8b3cf5] pb-[50px] text-xs font-medium text-white"
-                >{{ formatPercentage(dashboardData.courseCompletionRate) }}</span
-              >
-              <span
-                class="bubble absolute left-[5px] top-[130px] grid size-[92px] place-items-center rounded-full bg-[#5e7ae4] pr-9 pt-[30px] text-xs font-medium text-white [animation-delay:100ms]"
-                >{{ formatNumber(dashboardData.onlineUsers) }}</span
-              >
-              <span
-                class="bubble absolute left-[55px] top-[23px] grid size-[200px] place-items-center rounded-full bg-[#41aac0] pl-[88px] text-xs font-medium text-white [animation-delay:180ms]"
-                >{{ dashboardData.averageLearningTime }}</span
+                >{{ formatPercentage(summaryData?.courseCompletionRate) }}</span
               >
             } @else {
-              <span class="absolute left-0 top-0 size-[110px] rounded-full bg-[#8b3cf5]/20"></span>
-              <span class="absolute left-[5px] top-[130px] size-[92px] rounded-full bg-[#5e7ae4]/20"></span>
-              <span class="absolute left-[55px] top-[23px] size-[200px] rounded-full bg-[#41aac0]/20"></span>
+              <span class="absolute left-0 top-0 grid size-[110px] place-items-center rounded-full bg-[#8b3cf5]/20 pb-[50px] text-xs text-[#555]">—</span>
+            }
+            @if (hasOnlineUserCount) {
+              <span
+                class="bubble absolute left-[5px] top-[130px] grid size-[92px] place-items-center rounded-full bg-[#5e7ae4] pr-9 pt-[30px] text-xs font-medium text-white [animation-delay:100ms]"
+                >{{ formatNumber(summaryData?.onlineUsers) }}</span
+              >
+            } @else {
+              <span class="absolute left-[5px] top-[130px] grid size-[92px] place-items-center rounded-full bg-[#5e7ae4]/20 pr-9 pt-[30px] text-xs text-[#555]">—</span>
+            }
+            @if (hasAverageLearningTime) {
+              <span
+                class="bubble absolute left-[55px] top-[23px] grid size-[200px] place-items-center rounded-full bg-[#41aac0] pl-[88px] text-xs font-medium text-white [animation-delay:180ms]"
+                >{{ getAverageLearningTimeDisplay() }}</span
+              >
+            } @else {
+              <span class="absolute left-[55px] top-[23px] grid size-[200px] place-items-center rounded-full bg-[#41aac0]/20 pl-[88px] text-xs text-[#555]">—</span>
             }
           </div>
 
@@ -330,7 +454,7 @@
             <li class="flex items-center gap-3">
               <span class="size-3 rounded-full bg-[#60b9c9]"></span>
               <span>Average Learning Time</span>
-              <strong class="sr-only">{{ dashboardData?.averageLearningTime }}</strong>
+              <strong class="sr-only">{{ getAverageLearningTimeDisplay() }}</strong>
             </li>
             <li class="flex items-center gap-3">
               <span class="size-3 rounded-full bg-purple-500"></span>
@@ -340,9 +464,12 @@
             <li class="flex items-center gap-3">
               <span class="size-3 rounded-full bg-blue-500"></span>
               <span>Online Users</span>
-              <strong class="sr-only">{{ formatNumber(dashboardData?.onlineUsers) }}</strong>
+              <strong class="sr-only">{{ summaryData ? formatNumber(summaryData.onlineUsers) : '—' }}</strong>
             </li>
           </ul>
+          @if (summaryUnavailableMessage) {
+            <span class="sr-only" role="status">{{ summaryUnavailableMessage }}</span>
+          }
         </div>
       </section>
     </div>

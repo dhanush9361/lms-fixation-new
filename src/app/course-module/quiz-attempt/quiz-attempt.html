@@ -225,6 +225,7 @@
               <label class="mt-2 block">
                 <span class="sr-only">Your answer</span>
                 <textarea
+                  [attr.aria-describedby]="textAnswerError() ? 'short-answer-error' : null"
                   class="min-h-[110px] w-full resize-none rounded-xl bg-white px-5 py-3 text-[14px] text-[#4b4b4b] outline-none placeholder:text-[#9aa0a2] focus-visible:ring-2 focus-visible:ring-[#61b7c5]/60 disabled:cursor-not-allowed disabled:opacity-70"
                   maxlength="500"
                   placeholder="Type your answer"
@@ -232,6 +233,9 @@
                   [disabled]="locked()"
                   (input)="onTextInput(question, $event)"
                 ></textarea>
+                @if (textAnswerError()) {
+                  <span id="short-answer-error" class="mt-1 block text-[12px] text-red-700" role="alert">{{ textAnswerError() }}</span>
+                }
               </label>
             } @else {
               <div class="mt-2 space-y-2.5" [attr.role]="question.type === 'SINGLE_ANSWER' ? 'radiogroup' : 'group'" [attr.aria-labelledby]="'q-title-' + question.id">

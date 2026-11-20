@@ -1,12 +1,14 @@
+import { HttpErrorResponse } from '@angular/common/http';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { EMPTY, catchError, of, switchMap, timer } from 'rxjs';
+import { catchError, concat, map, of, switchMap, timer } from 'rxjs';
 
 import {
   AdminDashboardData,
   AdminDashboardService,
   DashboardPeriod,
   DashboardSeries,
+  UserDistribution,
 } from '../../services/admin-dashboard.service';
 import { AuthService } from '../../services/auth';
 
@@ -16,13 +18,57 @@ type RoleKey = 'admins' | 'instructors' | 'learners';
 /** Optional "+12%" growth badge shown next to the legend totals (add `change` to DashboardSeries in the service). */
 type SeriesWithChange = DashboardSeries & { change?: number | null };
 
-/** Labels of the "Time Period" select -> API value. */
-const PERIOD_OPTIONS = {
-  'Last 7 Days': 'WEEK',
-  'Last 30 Days': 'MONTH',
-  'Last 12 Months': 'YEAR',
-} as const satisfies Record<string, DashboardPeriod>;
-type PeriodLabel = keyof typeof PERIOD_OPTIONS;
+const PERIOD_OPTIONS = [
+  'Today',
+  'Yesterday',
+  'This Week',
+  'This Month',
+  'Last Week',
+  'Last 7 Days',
+  'Last 30 Days',
+  'Last 60 Days',
+  'Last 90 Days',
+  'Last 180 Days',
+  'Last Year',
+  'Custom Date Range',
+] as const;
+type PeriodLabel = (typeof PERIOD_OPTIONS)[number];
+
+interface DateRange {
+  from: string;
+  to: string;
+}
+
+interface DashboardRequest {
+  period: PeriodLabel;
+  range: DateRange | null;
+  apiPeriod: DashboardPeriod;
+  online: boolean;
+}
+
+interface DashboardSummary {
+  userDistribution: UserDistribution | null;
+  courseCompletionRate: number | null;
+  onlineUsers: number | null;
+  averageLearningTime: string | null;
+}
+
+type DashboardState =
+  | { status: 'loading' }
+  | { status: 'offline' }
+  | { status: 'error'; message: string }
+  | { status: 'invalid-range'; message: string }
+  | {
+      status: 'loaded';
+      data: AdminDashboardData | null;
+      summary: DashboardSummary;
+      notice?: string;
+    };
+
+const EMPTY_DATE_RANGE_MESSAGE = 'Select a valid start and end date.';
+const DATE_ORDER_ERROR_MESSAGE = 'The end date must not be earlier than the start date.';
+const SUMMARY_UNAVAILABLE_MESSAGE =
+  'Summary metrics are available only for the API-supported reporting periods.';
 
 /** How often the dashboard reloads itself (the backend counts a user online for 2 minutes after a heartbeat). */
 const REFRESH_MS = 30_000;
@@ -145,11 +191,139 @@ function sectorPath(startDeg: number, endDeg: number, gapped: boolean): string {
   return `M ${a.x} ${a.y} A ${outer} ${outer} 0 ${largeOuter} 1 ${b.x} ${b.y} L ${c.x} ${c.y} A ${inner} ${inner} 0 ${largeInner} 0 ${d.x} ${d.y} Z`;
 }
 
+function dateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function dateAtUtc(year: number, monthIndex: number, day: number): Date {
+  const date = new Date(0);
+  date.setUTCHours(0, 0, 0, 0);
+  date.setUTCFullYear(year, monthIndex, day);
+  return date;
+}
+
+function shiftDateKey(value: string, days: number): string {
+  const [year, month, day] = value.split('-').map(Number);
+  const date = dateAtUtc(year, month - 1, day + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function isValidDateKey(value: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = dateAtUtc(year, month - 1, day);
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function dateRangeForPeriod(period: PeriodLabel, from: string, to: string): DateRange | null {
+  const today = dateKey(new Date());
+  const previousDay = shiftDateKey(today, -1);
+  const [year, month, day] = today.split('-').map(Number);
+  const daysSinceMonday = (dateAtUtc(year, month - 1, day).getUTCDay() + 6) % 7;
+
+  switch (period) {
+    case 'Today':
+      return { from: today, to: today };
+    case 'Yesterday':
+      return { from: previousDay, to: previousDay };
+    case 'This Week':
+      return { from: shiftDateKey(today, -daysSinceMonday), to: today };
+    case 'This Month':
+      return { from: `${today.slice(0, 7)}-01`, to: today };
+    case 'Last Week': {
+      const thisWeekStart = shiftDateKey(today, -daysSinceMonday);
+      return { from: shiftDateKey(thisWeekStart, -7), to: shiftDateKey(thisWeekStart, -1) };
+    }
+    case 'Last 7 Days':
+      return { from: shiftDateKey(today, -6), to: today };
+    case 'Last 30 Days':
+      return { from: shiftDateKey(today, -29), to: today };
+    case 'Last 60 Days':
+      return { from: shiftDateKey(today, -59), to: today };
+    case 'Last 90 Days':
+      return { from: shiftDateKey(today, -89), to: today };
+    case 'Last 180 Days':
+      return { from: shiftDateKey(today, -179), to: today };
+    case 'Last Year': {
+      const [year, month, day] = today.split('-').map(Number);
+      return {
+        from: dateAtUtc(year - 1, month - 1, day).toISOString().slice(0, 10),
+        to: today,
+      };
+    }
+    case 'Custom Date Range':
+      return isValidDateKey(from) && isValidDateKey(to) && from <= to ? { from, to } : null;
+  }
+}
+
+function daysBetween(range: DateRange): number {
+  const [fromYear, fromMonth, fromDay] = range.from.split('-').map(Number);
+  const [toYear, toMonth, toDay] = range.to.split('-').map(Number);
+  const from = dateAtUtc(fromYear, fromMonth - 1, fromDay).getTime();
+  const to = dateAtUtc(toYear, toMonth - 1, toDay).getTime();
+  return Math.floor((to - from) / 86_400_000) + 1;
+}
+
+function apiPeriodForRange(range: DateRange): DashboardPeriod {
+  const days = daysBetween(range);
+  if (days <= 7) return 'WEEK';
+  if (days <= 30) return 'MONTH';
+  return 'YEAR';
+}
+
+function formatDateLabel(value: string, includeYear: boolean): string {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Intl.DateTimeFormat('en', {
+    day: 'numeric',
+    month: 'short',
+    ...(includeYear ? { year: 'numeric' } : {}),
+    timeZone: 'UTC',
+  }).format(dateAtUtc(year, month - 1, day));
+}
+
+function filterDailySeries(series: DashboardSeries, range: DateRange): DashboardSeries | null {
+  if (series.labels.length !== series.values.length) return null;
+  if (series.labels.length === 0 || daysBetween(range) > 366) return null;
+
+  const countsByDate = new Map<string, number>();
+  for (let index = 0; index < series.labels.length; index += 1) {
+    const label = series.labels[index];
+    const value = series.values[index];
+    if (!isValidDateKey(label) || !Number.isFinite(value)) return null;
+    countsByDate.set(label, (countsByDate.get(label) ?? 0) + value);
+  }
+  const sourceDates = [...countsByDate.keys()].sort();
+  if (sourceDates.some((date, index) => index > 0 && shiftDateKey(sourceDates[index - 1], 1) !== date)) {
+    return null;
+  }
+
+  const dates = Array.from({ length: daysBetween(range) }, (_, index) =>
+    shiftDateKey(range.from, index),
+  );
+  if (!dates.every((date) => countsByDate.has(date))) return null;
+
+  const values = dates.map((date) => countsByDate.get(date) ?? 0);
+  const includeYear = range.from.slice(0, 4) !== range.to.slice(0, 4);
+  return {
+    labels: dates.map((date) => formatDateLabel(date, includeYear)),
+    values,
+    total: values.reduce((sum, value) => sum + value, 0),
+  };
+}
+
 @Component({
   selector: 'app-admin-dashboard-home',
   templateUrl: './admin-dashboard-home.html',
   styleUrl: './admin-dashboard-home.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
+  host: {
+    '(window:offline)': 'onNetworkOffline()',
+    '(window:online)': 'onNetworkOnline()',
+    '(document:click)': 'closePeriodControls()',
+  },
 })
 export class AdminDashboardHome {
   private readonly auth = inject(AuthService);
@@ -159,52 +333,204 @@ export class AdminDashboardHome {
   readonly userName = computed(() => this.auth.user()?.firstName?.trim() || this.auth.displayName());
 
   // ---------- period filter ----------
-  readonly timePeriods = Object.keys(PERIOD_OPTIONS) as PeriodLabel[];
-  private readonly period = signal<PeriodLabel>('Last 30 Days');
+  readonly timePeriods = PERIOD_OPTIONS;
+  private readonly period = signal<PeriodLabel>('Last 7 Days');
+  readonly fromDate = signal('');
+  readonly toDate = signal('');
+  readonly draftFromDate = signal('');
+  readonly draftToDate = signal('');
+  readonly openPeriodDropdown = signal(false);
+  readonly periodDropdownUsed = signal(false);
+  readonly customDatePickerOpen = signal(false);
+  private readonly online = signal(typeof navigator === 'undefined' || navigator.onLine);
+  private readonly retryCount = signal(0);
 
   /** Read by the template as a plain property: `[value]="selectedPeriod"`. */
   get selectedPeriod(): PeriodLabel {
     return this.period();
   }
 
-  onPeriodChange(event: Event): void {
-    if (!(event.target instanceof HTMLSelectElement)) return;
-    const label = event.target.value;
-    if (this.isPeriodLabel(label)) this.period.set(label);
+  get selectedPeriodLabel(): string {
+    if (this.period() !== 'Custom Date Range') return 'Time Period';
+    const includeYear = this.fromDate().slice(0, 4) !== this.toDate().slice(0, 4);
+    return `${formatDateLabel(this.fromDate(), includeYear)} - ${formatDateLabel(this.toDate(), includeYear)}`;
+  }
+
+  get customDateRangeError(): string {
+    const start = this.draftFromDate();
+    const end = this.draftToDate();
+    if (start && end && start > end) return DATE_ORDER_ERROR_MESSAGE;
+    return '';
+  }
+
+  get canApplyCustomDateRange(): boolean {
+    const start = this.draftFromDate();
+    const end = this.draftToDate();
+    return isValidDateKey(start) && isValidDateKey(end) && start <= end;
+  }
+
+  togglePeriodDropdown(): void {
+    this.openPeriodDropdown.update((open) => !open);
+    this.periodDropdownUsed.set(true);
+    this.customDatePickerOpen.set(false);
+  }
+
+  selectPeriod(label: PeriodLabel): void {
+    this.openPeriodDropdown.set(false);
+    if (label === 'Custom Date Range') {
+      this.draftFromDate.set(this.fromDate());
+      this.draftToDate.set(this.toDate());
+      this.customDatePickerOpen.set(true);
+      return;
+    }
+    this.customDatePickerOpen.set(false);
+    this.fromDate.set('');
+    this.toDate.set('');
+    this.period.set(label);
+  }
+
+  onFromDateChange(event: Event): void {
+    if (event.target instanceof HTMLInputElement) this.draftFromDate.set(event.target.value);
+  }
+
+  onToDateChange(event: Event): void {
+    if (event.target instanceof HTMLInputElement) this.draftToDate.set(event.target.value);
+  }
+
+  applyCustomDateRange(): void {
+    if (!this.canApplyCustomDateRange) return;
+    this.fromDate.set(this.draftFromDate());
+    this.toDate.set(this.draftToDate());
+    this.period.set('Custom Date Range');
+    this.customDatePickerOpen.set(false);
+  }
+
+  cancelCustomDateRange(): void {
+    this.draftFromDate.set(this.fromDate());
+    this.draftToDate.set(this.toDate());
+    this.customDatePickerOpen.set(false);
+  }
+
+  closePeriodControls(): void {
+    this.openPeriodDropdown.set(false);
+    this.customDatePickerOpen.set(false);
+  }
+
+  onNetworkOffline(): void {
+    this.online.set(false);
+  }
+
+  onNetworkOnline(): void {
+    this.online.set(true);
+  }
+
+  retryDashboardLoad(): void {
+    this.retryCount.update((count) => count + 1);
   }
 
   // ---------- data ----------
-  /**
-   * Loads when the period changes, then again every REFRESH_MS so "Online Users" and the charts stay live.
-   * A failed first load shows the "No chart data" state; a failed refresh keeps the numbers already on screen.
-   */
-  private readonly data = toSignal(
-    toObservable(this.period).pipe(
-      switchMap((label) =>
-        timer(0, REFRESH_MS).pipe(
-          switchMap((tick) =>
-            this.api
-              .getAdminDashboard(PERIOD_OPTIONS[label])
-              .pipe(catchError(() => (tick === 0 ? of(null) : EMPTY))),
+  private readonly request = computed(() => {
+    const period = this.period();
+    const range = dateRangeForPeriod(period, this.fromDate(), this.toDate());
+    return {
+      period,
+      range,
+      apiPeriod: range ? apiPeriodForRange(range) : 'WEEK',
+      online: this.online(),
+      retryCount: this.retryCount(),
+    } satisfies DashboardRequest & { retryCount: number };
+  });
+
+  private readonly state = toSignal(
+    toObservable(this.request).pipe(
+      switchMap((request) => {
+        if (!request.range) {
+          return of<DashboardState>({
+            status: 'invalid-range',
+            message: EMPTY_DATE_RANGE_MESSAGE,
+          });
+        }
+        if (!request.online) return of<DashboardState>({ status: 'offline' });
+
+        return concat(
+          of<DashboardState>({ status: 'loading' }),
+          this.api.getAdminDashboard(request.apiPeriod).pipe(
+            switchMap((data) =>
+              concat(
+                of(this.toLoadedState(data, request)),
+                timer(REFRESH_MS, REFRESH_MS).pipe(
+                  switchMap(() =>
+                    this.api.getAdminDashboard(request.apiPeriod).pipe(
+                      map((updatedData) => this.toLoadedState(updatedData, request)),
+                      catchError((error: unknown) =>
+                        of(this.toErrorState(error, request.online)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            catchError((error: unknown) =>
+              of(this.toErrorState(error, request.online)),
+            ),
           ),
-        ),
-      ),
+        );
+      }),
     ),
-    { initialValue: null as AdminDashboardData | null },
+    { initialValue: { status: 'loading' } as DashboardState },
   );
 
   /** Read by the template as a plain property: `dashboardData?.logins?.total`. */
   get dashboardData(): AdminDashboardData | null {
-    return this.data();
+    const state = this.state();
+    return state.status === 'loaded' ? state.data : null;
+  }
+
+  get summaryData(): DashboardSummary | null {
+    const state = this.state();
+    return state.status === 'loaded' ? state.summary : null;
+  }
+
+  get dashboardStatus(): DashboardState['status'] {
+    return this.state().status;
+  }
+
+  get dashboardStateMessage(): string {
+    const state = this.state();
+    if (state.status === 'error') return state.message;
+    if (state.status === 'offline') return 'Network connection unavailable. Check your connection and try again.';
+    if (state.status === 'invalid-range') return state.message;
+    return 'Loading dashboard data...';
+  }
+
+  get dateFilterNotice(): string {
+    const state = this.state();
+    return state.status === 'loaded' ? (state.notice ?? '') : '';
+  }
+
+  get canRetryDashboardLoad(): boolean {
+    const status = this.state().status;
+    return status === 'error' || status === 'offline';
+  }
+
+  get summaryUnavailableMessage(): string {
+    const state = this.state();
+    return state.status === 'loaded' &&
+      state.data &&
+      (!state.summary.userDistribution ||
+        state.summary.onlineUsers === null ||
+        state.summary.averageLearningTime === null)
+      ? SUMMARY_UNAVAILABLE_MESSAGE
+      : '';
   }
 
   hasChartData(key: SeriesKey): boolean {
-    return (this.data()?.[key]?.values ?? []).some((value) => value > 0);
+    return (this.dashboardData?.[key]?.values ?? []).some((value) => value > 0);
   }
 
   /** Growth badge ("+12%") next to a legend total; null when the API doesn't send one. */
   getChange(key: 'logins' | 'newSignups'): number | null {
-    return (this.data()?.[key] as SeriesWithChange | undefined)?.change ?? null;
+    return (this.dashboardData?.[key] as SeriesWithChange | undefined)?.change ?? null;
   }
 
   formatChange(value: number | null): string {
@@ -215,7 +541,7 @@ export class AdminDashboardHome {
 
   // ---------- x axis: Apr 1, Apr 5, Apr 10 ... (not every label) ----------
   private readonly axisLabels = computed(() => {
-    const data = this.data();
+    const data = this.dashboardData;
     const build = (series: DashboardSeries | undefined): AxisLabel[] => {
       const labels = series?.labels ?? [];
       const step = labels.length <= 8 ? 1 : Math.ceil(labels.length / 7);
@@ -236,13 +562,13 @@ export class AdminDashboardHome {
 
   // ---------- Login's & Sign up's chart (both lines share one y-axis) ----------
   private readonly loginScale = computed(() => {
-    const data = this.data();
+    const data = this.dashboardData;
     const max = Math.max(0, ...(data?.logins?.values ?? []), ...(data?.newSignups?.values ?? []));
     return buildScale(max, true);
   });
 
   private readonly revenueScale = computed(() =>
-    buildScale(Math.max(0, ...(this.data()?.revenue?.values ?? [])), false),
+    buildScale(Math.max(0, ...(this.dashboardData?.revenue?.values ?? [])), false),
   );
 
   get loginTicks(): number[] {
@@ -262,7 +588,7 @@ export class AdminDashboardHome {
   }
 
   private readonly charts = computed(() => {
-    const data = this.data();
+    const data = this.dashboardData;
     const loginScale = this.loginScale();
     const revenueScale = this.revenueScale();
     const plot = (series: DashboardSeries | undefined, scale: AxisScale): Point[] =>
@@ -311,13 +637,13 @@ export class AdminDashboardHome {
   ];
 
   private readonly donut = computed(() => {
-   const distribution = this.data()?.userDistribution;
-const all: { key: RoleKey; color: string; count: number }[] = [
-  { key: 'admins', color: '#a96bfa', count: distribution?.admins ?? 0 },
-  { key: 'instructors', color: '#ffcf5e', count: distribution?.instructors ?? 0 },
-  { key: 'learners', color: '#7b8fe6', count: distribution?.learners ?? 0 },
-];
-const entries = all.filter((entry) => entry.count > 0);
+    const distribution = this.summaryData?.userDistribution;
+    const all: { key: RoleKey; color: string; count: number }[] = [
+      { key: 'admins', color: '#a96bfa', count: distribution?.admins ?? 0 },
+      { key: 'instructors', color: '#ffcf5e', count: distribution?.instructors ?? 0 },
+      { key: 'learners', color: '#7b8fe6', count: distribution?.learners ?? 0 },
+    ];
+    const entries = all.filter((entry) => entry.count > 0);
 
     const total = entries.reduce((sum, entry) => sum + entry.count, 0);
     let start = 0;
@@ -339,15 +665,35 @@ const entries = all.filter((entry) => entry.count > 0);
   }
 
   getRolePercentage(role: RoleKey): string {
-    const distribution = this.data()?.userDistribution;
+    const distribution = this.summaryData?.userDistribution;
     const total = this.donut().total;
-    if (!distribution || !total) return '0%';
-    return `${Math.round((distribution[role] / total) * 100)}%`;
+    if (!distribution || !total) return '—';
+
+    const roles: RoleKey[] = ['admins', 'instructors', 'learners'];
+    const percentages = roles.map((key) => {
+      const exact = (distribution[key] / total) * 100;
+      return { key, roundedDown: Math.floor(exact), remainder: exact - Math.floor(exact) };
+    });
+    const remaining = 100 - percentages.reduce((sum, item) => sum + item.roundedDown, 0);
+    percentages
+      .slice()
+      .sort((left, right) => right.remainder - left.remainder)
+      .slice(0, remaining)
+      .forEach((item) => {
+        const percentage = percentages.find((entry) => entry.key === item.key);
+        if (percentage) percentage.roundedDown += 1;
+      });
+    return `${percentages.find((item) => item.key === role)?.roundedDown ?? 0}%`;
+  }
+
+  getRoleCount(role: RoleKey): string {
+    const count = this.summaryData?.userDistribution?.[role];
+    return count === undefined ? '—' : this.formatNumber(count);
   }
 
   // ---------- formatting ----------
   formatNumber(value: number | null | undefined): string {
-    if (value === null || value === undefined || Number.isNaN(value)) return '0';
+    if (value === null || value === undefined || !Number.isFinite(value)) return '—';
     return new Intl.NumberFormat('en', {
       notation: Math.abs(value) >= 10_000 ? 'compact' : 'standard',
       maximumFractionDigits: 1,
@@ -355,13 +701,30 @@ const entries = all.filter((entry) => entry.count > 0);
   }
 
   formatPercentage(value: number | null | undefined): string {
-    const rate = value ?? 0;
+    if (value === null || value === undefined || !Number.isFinite(value)) return '—';
+    const rate = value;
     return `${Number.isInteger(rate) ? rate : rate.toFixed(1)}%`;
   }
 
+  get hasCourseCompletionRate(): boolean {
+    return this.summaryData?.courseCompletionRate !== null &&
+      this.summaryData?.courseCompletionRate !== undefined;
+  }
+
+  get hasOnlineUserCount(): boolean {
+    return this.summaryData?.onlineUsers !== null && this.summaryData?.onlineUsers !== undefined;
+  }
+
+  get hasAverageLearningTime(): boolean {
+    return !!this.summaryData?.averageLearningTime;
+  }
+
   getCourseCompletionDisplay(): string {
-    const data = this.data();
-    return data ? this.formatPercentage(data.courseCompletionRate) : '—';
+    return this.formatPercentage(this.summaryData?.courseCompletionRate);
+  }
+
+  getAverageLearningTimeDisplay(): string {
+    return this.summaryData?.averageLearningTime || '—';
   }
 
   // ---------- helpers ----------
@@ -375,7 +738,67 @@ const entries = all.filter((entry) => entry.count > 0);
     return PLOT_BOTTOM - (Math.min(value, scale.top) / scale.top) * (PLOT_BOTTOM - PLOT_TOP);
   }
 
-  private isPeriodLabel(value: string): value is PeriodLabel {
-    return Object.prototype.hasOwnProperty.call(PERIOD_OPTIONS, value);
+  private toLoadedState(
+    data: AdminDashboardData | null,
+    request: DashboardRequest,
+  ): DashboardState {
+    const summary: DashboardSummary = {
+      userDistribution: data?.userDistribution ?? null,
+      courseCompletionRate: data?.courseCompletionRate ?? null,
+      onlineUsers: data?.onlineUsers ?? null,
+      averageLearningTime: data?.averageLearningTime ?? null,
+    };
+
+    if (
+      request.period === 'Last 7 Days' ||
+      request.period === 'Last 30 Days' ||
+      request.period === 'Last Year' ||
+      request.period === 'This Week' ||
+      request.period === 'This Month'
+    ) {
+      return { status: 'loaded', data, summary };
+    }
+    if (!data || !request.range) return { status: 'loaded', data, summary };
+
+    const logins = filterDailySeries(data.logins, request.range);
+    const newSignups = filterDailySeries(data.newSignups, request.range);
+    const revenue =
+      data.revenue.labels.length === 0 && data.revenue.values.length === 0
+        ? { labels: [], values: [], total: 0 }
+        : filterDailySeries(data.revenue, request.range);
+    if (!logins || !newSignups || !revenue) {
+      return {
+        status: 'loaded',
+        data,
+        summary,
+        notice:
+          `The dashboard API returned a ${data.period} report without daily records for this selection. ` +
+          `Showing the available ${data.period} report.`,
+      };
+    }
+    return {
+      status: 'loaded',
+      data: { ...data, logins, newSignups, revenue },
+      summary: {
+        userDistribution: null,
+        courseCompletionRate: null,
+        onlineUsers: null,
+        averageLearningTime: null,
+      },
+    };
+  }
+
+  private toErrorState(error: unknown, online: boolean): DashboardState {
+    if (!online) return { status: 'offline' };
+    if (error instanceof HttpErrorResponse && error.status === 0) {
+      return {
+        status: 'error',
+        message: 'Unable to connect to the Dashboard API. Please try again.',
+      };
+    }
+    return {
+      status: 'error',
+      message: 'Dashboard data could not be loaded. Please try again.',
+    };
   }
 }

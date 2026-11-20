@@ -3,6 +3,29 @@
  * SVG animations stay here (Angular scopes @keyframes per component).
  */
 
+.admin-dashboard-date-options {
+  max-height: 256px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  scrollbar-color: #b8b8b8 transparent;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.admin-dashboard-date-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.admin-dashboard-date-options::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background-color: #b8b8b8;
+}
+
+.admin-dashboard-date-options::-webkit-scrollbar-track {
+  background: transparent;
+}
+
 .chart-area {
   transform-box: fill-box;
   transform-origin: center bottom;

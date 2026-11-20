@@ -97,6 +97,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
 
   // ---------- local answer state ----------
   protected readonly answers = signal<Record<number, QuizAnswer>>({});
+  protected readonly textAnswerError = signal<string | null>(null);
   /** Answered, changed on screen but not saved on the server yet (yellow). */
   protected readonly dirtyIds = signal<ReadonlySet<number>>(new Set());
   /** Questions the learner has opened (an opened question without an answer is "Incomplete", red). */
@@ -128,6 +129,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   private timerHandle: ReturnType<typeof setInterval> | null = null;
   private timerBase = 0;
   private timerStartedAt = 0;
+  private printFrame: HTMLIFrameElement | null = null;
 
   private readonly paletteHost = viewChild<ElementRef<HTMLDivElement>>('paletteHost');
 
@@ -225,6 +227,8 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
 
   ngOnDestroy(): void {
     this.stopTimer();
+    this.printFrame?.remove();
+    this.printFrame = null;
     // best effort: do not lose the last typed answers when the learner leaves the page
     this.saveTimers.forEach((handle) => clearTimeout(handle));
     this.saveTimers.clear();
@@ -264,6 +268,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     this.reviewKind.set(null);
     this.review.set(null);
     this.actionError.set(null);
+    this.textAnswerError.set(null);
     this.confirm.set(null);
 
     this.attempt.set(attempt);
@@ -353,13 +358,87 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   }
 
   protected print(): void {
-    window.print();
+    const attempt = this.attempt();
+    if (!attempt) return;
+    this.printFrame?.remove();
+    const frame = document.createElement('iframe');
+    frame.title = 'Quiz print view';
+    frame.setAttribute('aria-hidden', 'true');
+    frame.style.position = 'fixed';
+    frame.style.width = '0';
+    frame.style.height = '0';
+    frame.style.border = '0';
+    this.printFrame = frame;
+    document.body.appendChild(frame);
+    const printWindow = frame.contentWindow;
+    if (!printWindow) {
+      frame.remove();
+      this.printFrame = null;
+      return;
+    }
+    if (attempt.status === 'SUBMITTED') {
+      this.api.review(this.courseId, this.courseSectionId, this.bankId).pipe(
+        catchError(() => of(null)),
+      ).subscribe((review) => this.writePrintDocument(frame, printWindow, attempt, review?.questions ?? null));
+      return;
+    }
+    this.writePrintDocument(frame, printWindow, attempt, null);
   }
-
+  private writePrintDocument(
+    frame: HTMLIFrameElement,
+    printWindow: Window,
+    attempt: QuizAttempt,
+    reviewQuestions: QuizReview['questions'] | null,
+  ): void {
+    const reviewById = new Map((reviewQuestions ?? []).map((question) => [question.id, question]));
+    let number = 0;
+    const sections = attempt.sections.map((section) => {
+    const questions = section.questions.map((question) => { number += 1;
+    const review = reviewById.get(question.id);
+    const answer = this.answers()[question.id] ?? question.answer;
+    let answerMarkup: string;
+    if (question.type === 'SHORT_TEXT') {
+          const text = review?.givenText ?? answer.text;
+          answerMarkup = `<p><strong>Your answer:</strong> ${this.escapeHtml(text?.trim() || 'Not answered')}</p>`;
+          if (review?.expectedAnswer) answerMarkup += `<p><strong>Correct answer:</strong> ${this.escapeHtml(review.expectedAnswer)}</p>`;
+        } else {
+          const selectedIds = new Set(review ? review.options.filter((option) => option.selected).map((option) => option.id) : answer.optionIds);
+              answerMarkup = `<ul>${question.options.map((option) => {
+          const selected = selectedIds.has(option.id);
+          const correct = review?.options.find((item) => item.id === option.id)?.correct ?? false;
+          const labels = [selected ? 'Your answer' : '', correct ? 'Correct answer' : ''].filter(Boolean).join(' · ');
+            return `<li>${this.escapeHtml(option.text)}${labels ? ` <span class="label">— ${this.escapeHtml(labels)}</span>` : ''}</li>`;
+          }).join('')}</ul>`;
+          if (!selectedIds.size) answerMarkup += '<p><strong>Your answer:</strong> Not answered</p>';
+        }
+        return `<article><p class="meta">Question ${number} · ${this.escapeHtml(section.name)}</p><h2>${this.escapeHtml(question.text)}</h2>${answerMarkup}${review?.feedback ? `<p class="feedback"><strong>Feedback:</strong> ${this.escapeHtml(review.feedback)}</p>` : ''}</article>`;
+      }).join('');
+      return `<section><h1>${this.escapeHtml(section.name)}</h1>${questions}</section>`;
+    }).join('');
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${this.escapeHtml(attempt.bankName)} - Quiz answers</title><style>
+      body{font:14px/1.5 Arial,sans-serif;color:#222;max-width:850px;margin:32px auto;padding:0 24px}h1{font-size:20px;border-bottom:1px solid #bbb;padding-bottom:8px}h2{font-size:16px;font-weight:600;margin:8px 0}article{break-inside:avoid;border-bottom:1px solid #ddd;padding:14px 0}.meta{font-size:12px;color:#666;margin:0}.label{font-size:12px;color:#28636c}li{margin:6px 0}.feedback{background:#f3f7f8;padding:8px}@media print{body{margin:0 auto;padding:0 12mm}section{break-after:auto}}
+      </style></head><body><header><h1>${this.escapeHtml(attempt.bankName)}</h1><p>${this.escapeHtml(attempt.courseName)}</p></header>${sections}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    // Wait until browser renders the print content
+    printWindow.addEventListener('afterprint', () => {
+     frame.remove();
+      if (this.printFrame === frame) {
+        this.printFrame = null;
+        }
+      }, { once: true });
+    printWindow.focus();
+    printWindow.print();   
+  }
+  private escapeHtml(value: string | null | undefined): string {
+    return (value ?? '').replace(/[&<>"']/g, (character) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+    })[character] ?? character);
+  }
   protected pad(n: number): string {
     return String(n).padStart(2, '0');
   }
-
   /** "Go to next unit" (next course section), or back to the course on the last unit. */
   protected goNextUnit(): void {
     const next = this.attempt()?.nextSectionId;
@@ -418,6 +497,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   protected onTextInput(question: QuizQuestion, event: Event): void {
     if (this.locked()) return;
     const value = (event.target as HTMLTextAreaElement).value;
+    this.textAnswerError.set(value.length >= 500 ? 'Maximum Length 500 Characters.' : null);
     this.setAnswer(question.id, { optionIds: [], text: value }, SAVE_DELAY_TEXT_MS);
   }
 
@@ -531,6 +611,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
 
   private moveTo(sectionIndex: number, questionIndex: number): void {
     this.leaveCurrent();
+    this.textAnswerError.set(null);
     this.sectionIndex.set(sectionIndex);
     this.questionIndex.set(questionIndex);
     const q = this.currentQuestion();
@@ -550,6 +631,12 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   protected next(): void {
     const section = this.currentSection();
     if (!section || this.isLast()) return;
+    const question = this.currentQuestion();
+    if (question?.type === 'SHORT_TEXT' && !this.hasAnswer(question.id)) {
+      this.textAnswerError.set('Answer is required.');
+      return;
+    }
+    this.textAnswerError.set(null);
     if (this.questionIndex() < section.questions.length - 1) {
       this.moveTo(this.sectionIndex(), this.questionIndex() + 1);
     } else {
