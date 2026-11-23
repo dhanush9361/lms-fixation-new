@@ -5,7 +5,7 @@ import { EMPTY, interval, timer } from 'rxjs';
 import { catchError, filter, map, startWith, switchMap } from 'rxjs/operators';
 
 import { AuthService,FEATURE } from '../../services/auth';
-import { ADMIN_MENU, isMenuVisible } from '../../config/admin-menu';
+import { ADMIN_MENU, AdminMenuItem, isMenuVisible } from '../../config/admin-menu';
 import { PackageService } from '../../services/package.service';
 import { RolePageState } from '../../services/role.service';
 import { Location } from '@angular/common';   
@@ -54,6 +54,15 @@ goBack(): void { this.location.back(); }
    * Recomputes by itself whenever the permissions change (see the refresh timer in the constructor).
    */
   readonly menuItems = computed(() => ADMIN_MENU.filter((item) => isMenuVisible(item, this.auth)));
+
+  /** True when the current page is one of the item's extra routes (e.g. Learner Report -> "Report" menu). */
+  isMenuActive(item: AdminMenuItem): boolean {
+    if (!item.activeRoutes) {
+      return false;
+    }
+    const path = this.currentUrl().split('#')[0].split('?')[0].replace(/\/$/, '');
+    return item.activeRoutes.some((route) => path === `/admin-dashboard/${route}`);
+  }
 
   constructor() {
     // Package / role can change while the page is open (expiry, role edited by the admin):
@@ -164,6 +173,20 @@ goBack(): void { this.location.back(); }
     const [path, query = ''] = this.currentUrl().split('#')[0].split('?');
     const params = new URLSearchParams(query);
     const courseList = ['/admin-dashboard', 'courses'];
+
+    // Reports (sidebar "Report"): Report > Course Report / Report > Learner Report
+    if (/^\/admin-dashboard\/course-report\/?$/.test(path)) {
+      return [
+        { label: 'Report', link: null, plain: true },
+        { label: 'Course Report', link: null, plain: true },
+      ];
+    }
+    if (/^\/admin-dashboard\/learner-report\/?$/.test(path)) {
+      return [
+        { label: 'Report', link: null, plain: true },
+        { label: 'Learner Report', link: null, plain: true },
+      ];
+    }
 
     // Organize Modules is reachable two ways: /courses?organize=:id and /courses/:id/organize
     const isOrganizeRoute = /^\/admin-dashboard\/courses\/\d+\/organize\/?$/.test(path);

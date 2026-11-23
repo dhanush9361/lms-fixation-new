@@ -23,6 +23,8 @@ export interface AdminMenuItem {
   readonly route: string;
   readonly icon: MenuIcon;
   readonly access: MenuAccess;
+  /** Extra routes (relative to /admin-dashboard) that also mark this menu as the active one. */
+  readonly activeRoutes?: readonly string[];
 }
 
 /** Anyone who may see / manage courses (same rule the backend uses for the Course List). */
@@ -83,6 +85,8 @@ export const ADMIN_MENU: readonly AdminMenuItem[] = [
     // Opens the Course Report; the Learner Report is its second tab.
     route: 'course-report',
     icon: 'report',
+    // Course Report and Learner Report are two tabs of the same menu.
+    activeRoutes: ['course-report', 'learner-report'],
     // Same rule the backend uses for reports (ReportService: isManager) = anyone who can manage courses.
     access: { type: 'feature', anyOf: COURSE_ACCESS },
   },

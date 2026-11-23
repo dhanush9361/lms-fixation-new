@@ -1,4 +1,341 @@
-<section class="px-4 py-6 sm:px-6 lg:px-10">
-  <h1 class="text-xl font-semibold text-[#333] 2xl:text-[25px]">Learner Dashboard</h1>
-  <p class="mt-1 text-sm text-[#505050] 2xl:text-[16px]">Welcome, {{ displayName() }}.</p>
-</section>
+<div
+  #root
+  class="relative flex min-h-0 w-full flex-col overflow-x-hidden overflow-y-auto bg-[#f5f5f5] px-4 pb-5 pt-4 xl:overflow-y-hidden xl:px-[28px] xl:pb-[22px] xl:pt-[14px]"
+  style="font-family: 'DM Sans', 'Inter', system-ui, sans-serif">
+
+  <div
+    class="flex min-h-0 flex-1 flex-col transition-all duration-700 ease-out"
+    [class.opacity-0]="!isVisible()"
+    [class.translate-y-4]="!isVisible()"
+  >
+
+    <!-- ============================ Welcome ============================ -->
+    <div class="card-in mb-[26px] flex shrink-0 flex-wrap items-baseline gap-3">
+      <h2 class="welcome-shimmer text-[28px] font-medium leading-none text-[#62bdca] sm:text-[30px]">
+        Hi {{ displayName() }}
+      </h2>
+      <span class="text-[13px] font-normal text-[#555]">Welcome Back</span>
+    </div>
+
+    <!-- ============================ Stat cards ============================ -->
+    <div class="mb-5 grid shrink-0 grid-cols-1 gap-[19px] sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div
+        *ngFor="let stat of stats(); let i = index"
+        class="stat-card group relative flex h-[79px] cursor-default items-center justify-between overflow-hidden rounded-2xl bg-white px-5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg"
+        [style.animation-delay.ms]="i * 90"
+        [attr.title]="stat.title"
+      >
+        <span
+          class="absolute left-0 top-1/2 h-[34px] w-[3px] -translate-y-1/2 rounded-r-full transition-all duration-300 group-hover:h-[50px] stat-bar" [style.animation-delay.ms]="i * 90 + 250"
+          [style.background-color]="stat.color"></span>
+
+        <span class="text-[13px] font-medium leading-[17px] text-[#555]">
+          {{ stat.lines[0] }}<br />{{ stat.lines[1] }}
+        </span>
+
+        <span
+          class="text-[30px] font-light tabular-nums leading-none text-[#555]"
+          [class.animate-pulse]="loading()">
+          {{ stat.display }}
+        </span>
+      </div>
+    </div>
+
+    <!-- ============================ Analytics ============================ -->
+    <div class="grid min-h-0 w-full flex-1 grid-cols-1 gap-5 xl:grid-cols-[1.18fr_1fr]">
+
+      <!-- ---------------------- Training Analytics ---------------------- -->
+      <div
+        class="card-in flex min-h-[420px] min-w-0 flex-col rounded-2xl bg-white p-[22px] shadow-sm transition-shadow duration-500 hover:shadow-md xl:min-h-0"
+        style="animation-delay: 450ms">
+
+        <div class="mb-5 flex shrink-0 flex-wrap items-center justify-between gap-3">
+          <h3 class="text-[19px] font-medium text-[#555]">Training Analytics</h3>
+
+          <span class="rounded-full bg-[#f5f5f5] px-[18px] py-[9px] text-xs text-[#777]">
+            Your total courses - {{ dashboard()?.enrolledCourses ?? '—' }}
+          </span>
+        </div>
+
+        <!-- plot -->
+        <div class="min-h-0 flex-1 py-2">
+          <div class="relative h-full">
+
+            <!-- Y axis labels (Hrs / min) -->
+            <span
+              *ngFor="let tick of trainingAxis().ticks; let i = index"
+              class="absolute left-0 w-12 -translate-y-1/2 text-xs leading-none text-[#666]"
+              [style.top.%]="(i * 100) / 6">
+              {{ tick === 0 ? '0' : tick + ' ' + trainingAxis().unit }}
+            </span>
+
+            <div class="absolute inset-y-0 left-12 right-0">
+
+              <!-- dashed grid -->
+              <div
+                *ngFor="let tick of trainingAxis().ticks; let i = index"
+                class="absolute inset-x-0 border-t border-dashed border-[#dedede]"
+                [class.grid-draw]="true" [style.animation-delay.ms]="i * 70 + 200" [style.top.%]="(i * 100) / 6"></div>
+
+              <!-- series layer: aligned with the course labels below -->
+              <div class="absolute inset-y-0 left-0 right-9">
+
+                <ng-container *ngIf="hasTrainingTime; else noTraining">
+                  <ng-container *ngFor="let key of trainingKey">
+                    <ng-container *ngIf="trainingChart() as chart">
+
+                      <!-- area + line (drawn left to right) -->
+                      <div class="chart-reveal absolute inset-0">
+                        <svg
+                          class="absolute inset-0 h-full w-full overflow-visible"
+                          viewBox="0 0 100 100" preserveAspectRatio="none"
+                          style="-webkit-mask-image: linear-gradient(to bottom, #000, rgba(0,0,0,.08)); mask-image: linear-gradient(to bottom, #000, rgba(0,0,0,.08));">
+                          <path [attr.d]="chart.area" fill="#5c73e8" fill-opacity="0.3" />
+                        </svg>
+                        <svg
+                          class="absolute inset-0 h-full w-full overflow-visible"
+                          viewBox="0 0 100 100" preserveAspectRatio="none">
+                          <path
+                            [attr.d]="chart.line"
+                            fill="none" stroke="#5c73e8" stroke-width="2.2"
+                            stroke-linecap="round" stroke-linejoin="round"
+                            vector-effect="non-scaling-stroke" />
+                        </svg>
+                      </div>
+
+                      <!-- single course: stem from the dot down to the baseline -->
+                      <div
+                        *ngIf="chart.points.length === 1"
+                        class="stem-grow pointer-events-none absolute bottom-0 border-l border-dashed border-[#5c73e8]/40"
+                        [style.left.%]="chart.points[0].x" [style.top.%]="chart.points[0].y"></div>
+
+                      <!-- hover guide line -->
+                      <ng-container *ngFor="let p of chart.points; let i = index">
+                        <div
+                          *ngIf="hoveredTraining() === i"
+                          class="tip pointer-events-none absolute bottom-0 border-l border-dashed border-[#5c73e8]/50"
+                          [style.left.%]="p.x" [style.top.%]="p.y"></div>
+                      </ng-container>
+
+                      <!-- dots -->
+                      <span
+                        *ngFor="let p of chart.points; let i = index"
+                        class="pointer-events-none absolute -translate-x-1/2 -translate-y-1/2"
+                        [style.left.%]="p.x" [style.top.%]="p.y">
+                        <span
+                          [class.dot-pulse]="p.minutes > 0"
+                          class="dot-pop block h-[10px] w-[10px] rounded-full border-2 border-white bg-[#5c73e8] shadow transition-transform duration-200"
+                          [class.scale-150]="hoveredTraining() === i"
+                          [style.animation-delay.ms]="650 + i * 130"></span>
+                      </span>
+
+                      <!-- hover columns -->
+                      <div
+                        *ngFor="let p of chart.points; let i = index"
+                        class="absolute inset-y-0 cursor-pointer"
+                        [style.left.%]="(i * 100) / chart.cols"
+                        [style.width.%]="100 / chart.cols"
+                        (mouseenter)="hoveredTraining.set(i)"
+                        (mouseleave)="hoveredTraining.set(null)"></div>
+
+                      <!-- tooltip -->
+                      <ng-container *ngFor="let p of chart.points; let i = index">
+                        <div
+                          *ngIf="hoveredTraining() === i"
+                          class="tip pointer-events-none absolute z-10 whitespace-nowrap rounded-lg bg-[#3f4a5a] px-3 py-1.5 text-[11px] text-white shadow-lg"
+                          [style.left.%]="p.x" [style.top.%]="p.y"
+                          [style.transform]="p.y < 22 ? 'translate(-50%, 14px)' : 'translate(-50%, calc(-100% - 12px))'">
+                          <p class="font-medium">{{ p.name }}</p>
+                          <p class="text-[#a9b6ff]">{{ p.label }}</p>
+                        </div>
+                      </ng-container>
+
+                    </ng-container>
+                  </ng-container>
+                </ng-container>
+
+                <ng-template #noTraining>
+                  <div class="absolute inset-0 flex items-center justify-center">
+                    <span class="rounded-full bg-white/90 px-5 py-2 text-sm text-[#999]">No data available</span>
+                  </div>
+                </ng-template>
+
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- course names + pager arrows -->
+        <div class="mt-3 flex shrink-0 items-center">
+          <div class="flex w-12 shrink-0 justify-center">
+            <button type="button" aria-label="Previous courses"
+              [disabled]="!canPrevTrainingPage" (click)="prevTrainingPage()"
+              class="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#e4f1f3] text-[#4fa8b8] transition hover:bg-[#cfe8ec] disabled:cursor-not-allowed disabled:bg-[#f0f0f0] disabled:text-[#c9c9c9]">
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+            </button>
+          </div>
+
+          <div class="flex min-w-0 flex-1">
+            <span
+              *ngFor="let p of trainingChart().points; let i = index"
+              class="min-w-0 flex-1 truncate px-1 text-center text-[11.5px] text-[#555] transition-colors duration-200"
+              [style.color]="hoveredTraining() === i ? '#5c73e8' : null"
+              [title]="p.name + ' - ' + p.label">
+              {{ p.name }}
+            </span>
+          </div>
+
+          <div class="flex w-9 shrink-0 justify-center">
+            <button type="button" aria-label="Next courses"
+              [disabled]="!canNextTrainingPage" (click)="nextTrainingPage()"
+              class="flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#e4f1f3] text-[#4fa8b8] transition hover:bg-[#cfe8ec] disabled:cursor-not-allowed disabled:bg-[#f0f0f0] disabled:text-[#c9c9c9]">
+              <svg viewBox="0 0 24 24" class="h-3.5 w-3.5" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ---------------------- Right column ---------------------- -->
+      <div class="grid min-h-0 min-w-0 grid-cols-1 gap-5 xl:grid-rows-[1.1fr_1fr]">
+
+        <!-- Quiz scores -->
+        <div
+          class="card-in flex min-h-[300px] min-w-0 flex-col rounded-2xl bg-white px-[22px] pb-[18px] pt-4 shadow-sm transition-shadow duration-500 hover:shadow-md xl:min-h-0"
+          style="animation-delay: 550ms">
+
+          <div class="mb-2 flex shrink-0 items-center justify-end">
+            <span class="flex items-center gap-1.5 text-[10px] text-[#777]">
+              <span class="h-2.5 w-2.5 rounded-[3px] bg-[#a064f5]"></span>
+              Scores
+            </span>
+          </div>
+
+          <div class="min-h-0 flex-1 py-2">
+            <div class="relative h-full">
+
+              <span
+                *ngFor="let tick of quizTicks; let i = index"
+                class="absolute left-0 w-9 -translate-y-1/2 text-xs leading-none text-[#666]"
+                [style.top.%]="i * 25">
+                {{ tick }}
+              </span>
+
+              <div class="absolute inset-y-0 left-9 right-0">
+                <div
+                  *ngFor="let tick of quizTicks; let i = index"
+                  class="absolute inset-x-0 border-t border-dashed border-[#dedede]"
+                  [class.grid-draw]="true" [style.animation-delay.ms]="i * 70 + 300" [style.top.%]="i * 25"></div>
+
+                <div class="absolute inset-y-0 left-0 right-9 flex">
+                  <ng-container *ngIf="hasQuizScores; else noQuiz">
+                    <div
+                      *ngFor="let quiz of quizPageItems(); let i = index"
+                      class="group relative flex h-full min-w-0 flex-1 items-end justify-center">
+
+                      <div
+                        class="bar-grow w-[26px] max-w-[60%] rounded-t-[5px] bg-[#a064f5] transition-[filter] duration-300 group-hover:brightness-110"
+                        [style.height]="'max(2px, ' + quiz.percentage + '%)'"
+                        [style.animation-delay.ms]="i * 110"></div>
+
+                      <div
+                        class="pointer-events-none absolute left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[#3f4a5a] px-3 py-1.5 text-[11px] text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                        [style.bottom]="'calc(' + quiz.percentage + '% + 10px)'">
+                        <p class="font-medium">{{ quiz.quizName }}</p>
+                        <p class="text-[#d4b8ff]">
+                          {{ quiz.score }}/{{ quiz.maxScore }} · {{ quiz.passed ? 'Passed' : 'Below ' + passPercent + '%' }}
+                        </p>
+                      </div>
+                    </div>
+                  </ng-container>
+
+                  <ng-template #noQuiz>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                      <span class="rounded-full bg-white/90 px-4 py-2 text-xs text-[#999]">No data available</span>
+                    </div>
+                  </ng-template>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- course names + pager arrows -->
+          <div class="mt-2 flex shrink-0 items-center">
+            <div class="flex w-9 shrink-0 justify-center">
+              <button type="button" aria-label="Previous quizzes"
+                [disabled]="!canPrevQuizPage" (click)="prevQuizPage()"
+                class="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#e4f1f3] text-[#4fa8b8] transition hover:bg-[#cfe8ec] disabled:cursor-not-allowed disabled:bg-[#f0f0f0] disabled:text-[#c9c9c9]">
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6" /></svg>
+              </button>
+            </div>
+
+            <div class="flex min-w-0 flex-1">
+              <span
+                *ngFor="let quiz of quizPageItems()"
+                class="min-w-0 flex-1 truncate px-1 text-center text-[11.5px] text-[#555]"
+                [title]="quiz.quizName + ' (' + quiz.courseName + ')'">
+                {{ quiz.courseName }}
+              </span>
+            </div>
+
+            <div class="flex w-9 shrink-0 justify-center">
+              <button type="button" aria-label="Next quizzes"
+                [disabled]="!canNextQuizPage" (click)="nextQuizPage()"
+                class="flex h-[20px] w-[20px] items-center justify-center rounded-full bg-[#e4f1f3] text-[#4fa8b8] transition hover:bg-[#cfe8ec] disabled:cursor-not-allowed disabled:bg-[#f0f0f0] disabled:text-[#c9c9c9]">
+                <svg viewBox="0 0 24 24" class="h-3 w-3" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6" /></svg>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Course status doughnut -->
+        <div
+          class="card-in flex min-h-[250px] min-w-0 items-center justify-center rounded-2xl bg-white p-[22px] shadow-sm transition-shadow duration-500 hover:shadow-md xl:min-h-0"
+          style="animation-delay: 650ms">
+
+          <div class="flex w-full flex-col items-center justify-center gap-8 sm:flex-row sm:gap-[72px] xl:h-full xl:min-h-0">
+
+            <div class="donut-in relative flex aspect-square h-[190px] shrink-0 items-center justify-center transition-transform duration-500 hover:scale-[1.03] xl:h-full xl:max-h-[235px] xl:min-h-[120px]">
+              <div class="h-full w-full rounded-full" [style.background]="doughnutGradient"></div>
+              <div class="absolute h-[55%] w-[55%] rounded-full bg-white"></div>
+              <div
+                class="absolute flex h-[37%] w-[37%] items-center justify-center rounded-full"
+                [class.center-pop]="hasNotStarted"
+                [style.background-color]="hasNotStarted ? '#5c73e8' : 'transparent'"
+                [style.color]="hasNotStarted ? '#ffffff' : '#555555'">
+                <span *ngIf="showDonutTotal" class="text-xl font-medium leading-none">
+                  {{ hasCourseStatus ? totalCourses : '—' }}
+                </span>
+              </div>
+            </div>
+
+            <div class="flex flex-col gap-[22px]">
+              <div
+                class="legend-in flex items-center gap-3"
+                *ngFor="let item of legend(); let i = index"
+                [style.animation-delay.ms]="900 + i * 120"
+                [attr.title]="item.title">
+                <span class="h-3 w-3 shrink-0 rounded-full" [style.background-color]="item.color"></span>
+                <span class="text-xs text-[#555]">{{ item.name }}</span>
+              </div>
+
+              <p *ngIf="!hasCourseStatus" class="text-xs text-[#999]">No data available</p>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- ============================ Error toast ============================ -->
+  <div
+    *ngIf="error()"
+    class="card-in absolute inset-x-4 bottom-4 z-20 flex flex-wrap items-center justify-between gap-4 rounded-xl border border-red-200 bg-red-50 p-4 shadow-lg xl:inset-x-[28px]">
+    <p class="text-sm text-red-700">{{ error() }}</p>
+
+    <button type="button" (click)="retry()"
+      class="rounded-lg bg-red-600 px-5 py-2 text-sm font-semibold text-white transition hover:bg-red-700">
+      Retry
+    </button>
+  </div>
+</div>

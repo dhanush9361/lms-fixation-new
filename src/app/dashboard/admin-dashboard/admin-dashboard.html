@@ -286,6 +286,7 @@
         <a
           [routerLink]="item.route"
           routerLinkActive="text-white"
+          [class.text-white]="isMenuActive(item)"
           class="group flex flex-col items-center gap-1 text-white/90 transition hover:text-white"
           [title]="item.title"
         >

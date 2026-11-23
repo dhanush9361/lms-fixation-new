@@ -28,6 +28,7 @@ export interface LearnerReportDto {
   completedCourses: number;
   incompleteCourses: number;
   enrolledCourses: number;
+  assignedCourses: number; // published courses of the organization
   averageScore: number | null; // 0-100, null = no score yet
   studyTime: string;           // e.g. "3h 20m"
   totalTimeOnPlatform: string; // e.g. "12h 45m"

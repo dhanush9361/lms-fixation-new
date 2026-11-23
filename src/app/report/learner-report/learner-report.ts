@@ -23,7 +23,7 @@ interface LearnerReportRow {
   completedCourses: number;
   incompleteCourses: number;
   enrolledCourses: number;
-  assignedCourses: string;
+  assignedCourses: number;
 
   averageScore: string;
   studyTime: string;
@@ -143,8 +143,7 @@ export class LearnerReport implements OnInit {
       completedCourses: report.completedCourses,
       incompleteCourses: report.incompleteCourses,
       enrolledCourses: report.enrolledCourses,
-      // Not recorded by the backend (no course-assignment feature) -> dash, not a guess.
-      assignedCourses: '—',
+      assignedCourses: report.assignedCourses,
       averageScore: report.averageScore === null ? '—' : `${report.averageScore.toFixed(2)}%`,
       studyTime: report.studyTime,
       totalTimeOnPlatform: report.totalTimeOnPlatform,

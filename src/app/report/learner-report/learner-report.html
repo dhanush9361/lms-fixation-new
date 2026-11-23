@@ -169,7 +169,7 @@
       <!-- Table -->
       @if (!loading() && filteredRows().length > 0) {
         <div class="h-full overflow-x-auto overflow-y-auto">
-          <table class="w-full min-w-[1120px] border-collapse text-left text-sm">
+          <table class="w-full min-w-[1900px] border-collapse text-left text-sm">
             <thead class="sticky top-0 z-10 bg-white">
               <tr class="h-[74px] border-b border-gray-100 text-[#373737]">
                 <th scope="col" class="min-w-[150px] px-9 font-medium">Learner</th>
@@ -179,6 +179,12 @@
                 <th scope="col" class="min-w-[230px] px-5 font-medium">Last Activity</th>
                 <th scope="col" class="min-w-[230px] px-5 font-medium">Last Login</th>
                 <th scope="col" class="min-w-[190px] px-5 text-center font-medium">Completed Course</th>
+                <th scope="col" class="min-w-[190px] px-5 text-center font-medium">Incompleted Course</th>
+                <th scope="col" class="min-w-[170px] px-5 text-center font-medium">Enrolled Courses</th>
+                <th scope="col" class="min-w-[180px] px-5 text-center font-medium">Assigned Courses</th>
+                <th scope="col" class="min-w-[140px] px-5 text-center font-medium">Avg. Score</th>
+                <th scope="col" class="min-w-[140px] px-5 text-center font-medium">Study Time</th>
+                <th scope="col" class="min-w-[210px] px-5 text-center font-medium">Total Time on Platform</th>
               </tr>
             </thead>
             <tbody>
@@ -191,6 +197,12 @@
                   <td class="px-5">{{ row.lastActivity }}</td>
                   <td class="px-5">{{ row.lastLogin }}</td>
                   <td class="px-5 text-center">{{ row.completedCourses }}</td>
+                  <td class="px-5 text-center">{{ row.incompleteCourses }}</td>
+                  <td class="px-5 text-center">{{ row.enrolledCourses }}</td>
+                  <td class="px-5 text-center">{{ row.assignedCourses }}</td>
+                  <td class="px-5 text-center">{{ row.averageScore }}</td>
+                  <td class="px-5 text-center">{{ row.studyTime }}</td>
+                  <td class="px-5 text-center">{{ row.totalTimeOnPlatform }}</td>
                 </tr>
               }
             </tbody>
