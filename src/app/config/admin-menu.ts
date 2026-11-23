@@ -1,6 +1,6 @@
 import { AccessRequirement, AuthService, FEATURE, MENU } from '../services/auth';
 
-export type MenuIcon = 'dashboard' | 'role' | 'course' | 'certificate' | 'subscription' | 'users';
+export type MenuIcon = 'dashboard' | 'role' | 'course' | 'report' | 'certificate' | 'subscription' | 'users';
 
 
 export type MenuAccess =
@@ -75,6 +75,16 @@ export const ADMIN_MENU: readonly AdminMenuItem[] = [
     route: 'courses',
     icon: 'course',
     access: { type: 'menu', categoryId: MENU.COURSE },
+  },
+  {
+    id: 'report',
+    label: 'Report',
+    title: 'Reports',
+    // Opens the Course Report; the Learner Report is its second tab.
+    route: 'course-report',
+    icon: 'report',
+    // Same rule the backend uses for reports (ReportService: isManager) = anyone who can manage courses.
+    access: { type: 'feature', anyOf: COURSE_ACCESS },
   },
   {
     id: 'certificate',

@@ -180,6 +180,22 @@ export const routes: Routes = [
         title: 'Course Management',
       },
 
+      // Reports (sidebar "Report"): Course Report + Learner Report. Same rule as the backend (course managers).
+      {
+        path: 'course-report',
+        canActivate: [featureGuard(...COURSE_ACCESS)],
+        loadComponent: () =>
+          import('./report/course-report/course-report').then((m) => m.CourseReport),
+        title: 'Course Report',
+      },
+      {
+        path: 'learner-report',
+        canActivate: [featureGuard(...COURSE_ACCESS)],
+        loadComponent: () =>
+          import('./report/learner-report/learner-report').then((m) => m.LearnerReport),
+        title: 'Learner Report',
+      },
+
       // NEW - learner pays for a paid course (same Payment page design, separate from Subscription payment)
       {
         path: 'courses/:courseId/payment',

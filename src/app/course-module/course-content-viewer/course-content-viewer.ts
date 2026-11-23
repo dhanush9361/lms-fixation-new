@@ -16,13 +16,14 @@ import {
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ActivatedRoute, Router } from '@angular/router';
-import { forkJoin, of } from 'rxjs';
-import { catchError } from 'rxjs/operators';
+import { EMPTY, forkJoin, of, timer } from 'rxjs';
+import { catchError, filter, switchMap } from 'rxjs/operators';
 
 import { Section, SectionManagementService } from '../../services/Section management.service';
 import { MultimediaManagementService } from '../../services/multimedia-management.service';
 import { EbookManagementService } from '../../services/ebook-management.service';
 import { CourseProgress, SectionProgressService } from '../../services/section-progress.service';
+import { StudyTimeService } from '../../services/study-time.service';
 import { QuestionBankService } from '../../services/question-bank.service';
 import { QuizAttemptService } from '../../services/quiz-attempt.service';
 import { CourseManagementService } from '../../services/course-management.service'; // adjust the path/file name to your project
@@ -87,6 +88,7 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
   private readonly quizService = inject(QuizAttemptService);
   private readonly courseService = inject(CourseManagementService);
   private readonly auth = inject(AuthService);
+  private readonly studyTime = inject(StudyTimeService);
 
   /** Admins / instructors who may organize modules manage the quiz; everyone else (learners) attempts it. */
   private isLearnerView(): boolean {
@@ -315,6 +317,22 @@ export class CourseContentViewer implements OnInit, AfterViewInit {
     this.loadProgress();
     // save the last bit of progress when the learner leaves the page
     this.destroyRef.onDestroy(() => this.flushAllProgress());
+    this.trackStudyTime();
+  }
+
+  /**
+   * Study time (Course Report / Learner Report): ping the backend every 30 s, but only for an enrolled
+   * learner (canTrackProgress) and only while this browser tab is visible. The backend measures the
+   * seconds itself, so a hidden or closed tab simply stops adding time.
+   */
+  private trackStudyTime(): void {
+    timer(5_000, 30_000)
+      .pipe(
+        filter(() => this.canTrackProgress() && document.visibilityState === 'visible'),
+        switchMap(() => this.studyTime.ping(this.courseId).pipe(catchError(() => EMPTY))),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe();
   }
 
   ngAfterViewInit(): void {
