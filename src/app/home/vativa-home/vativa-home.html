@@ -1,0 +1,475 @@
+<main class="min-h-screen bg-white font-['DM_Sans',sans-serif] text-[#505050]">
+  <header class="relative z-20 mx-auto flex max-w-[1440px] items-center justify-between gap-5 px-5 py-5 lg:px-12">
+    <a class="flex shrink-0 items-center gap-2" routerLink="/vativa-home" aria-label="VativaHub home">
+      <img
+        ngSrc="/imgcomponent/Vativa logo.png"
+        width="48"
+        height="48"
+        alt=""
+        class="h-10 w-10 object-contain"
+      />
+      <span class="leading-tight">
+        <span class="block text-sm font-semibold tracking-wide text-[#4c4c4c]">VATIVAHUB</span>
+        <span class="block text-[8px] tracking-[0.16em] text-[#6b6b6b]">DESIGN &amp; DEVELOPMENT</span>
+      </span>
+    </a>
+
+    <nav
+      class="hidden items-center gap-1 rounded-full bg-[#f5f5f5] px-4 py-2 text-[13px] text-[#686868] md:flex"
+      aria-label="Main navigation"
+    >
+      <a class="rounded-full px-5 py-2 text-[#6279e7] transition-colors hover:text-[#405edb]" routerLink="/vativa-home">Home</a>
+      <a class="rounded-full px-5 py-2 transition-colors hover:text-[#6279e7]" routerLink="/about-us">About Us</a>
+      <a class="rounded-full px-5 py-2 transition-colors hover:text-[#6279e7]" href="#services">Our Service</a>
+      <a class="rounded-full px-5 py-2 transition-colors hover:text-[#6279e7]" routerLink="/plans">Plans</a>
+      <a class="rounded-full px-5 py-2 transition-colors hover:text-[#6279e7]" routerLink="/contact-us">Contact Us</a>
+    </nav>
+
+    <div class="hidden shrink-0 items-center gap-2 md:flex">
+      <a
+        class="rounded-full border border-[#5268d4] px-4 py-3 text-xs font-medium text-[#5268d4] transition-colors hover:bg-[#f4f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6079e8] lg:px-6"
+        routerLink="/auth"
+        [queryParams]="{ view: 'login' }"
+      >
+        Login
+      </a>
+      <a
+        class="rounded-full border border-[#5268d4] px-4 py-3 text-xs font-medium text-[#5268d4] transition-colors hover:bg-[#f4f6ff] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6079e8] lg:px-6"
+        routerLink="/auth"
+      >
+        Sign Up
+      </a>
+      <a
+        class="rounded-full bg-[#5268d4] px-4 py-3 text-xs font-medium text-white shadow-sm transition-colors hover:bg-[#455bc2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6079e8] lg:px-6"
+        routerLink="/contact-us"
+      >
+        Ready For Your Queries
+      </a>
+    </div>
+
+    <button
+      class="inline-flex h-11 w-11 items-center justify-center rounded-full border border-[#e7e7e7] text-[#4f4f4f] transition-colors hover:bg-[#f5f5f5] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6079e8] md:hidden"
+      type="button"
+      [attr.aria-expanded]="menuOpen()"
+      aria-controls="mobile-navigation"
+      aria-label="Toggle navigation"
+      (click)="toggleMenu()"
+    >
+      <span aria-hidden="true" class="text-xl">{{ menuOpen() ? '×' : '☰' }}</span>
+    </button>
+
+    @if (menuOpen()) {
+      <nav
+        id="mobile-navigation"
+        class="absolute inset-x-5 top-full flex flex-col gap-1 rounded-2xl border border-[#ededed] bg-white p-3 text-sm shadow-lg md:hidden"
+        aria-label="Mobile navigation"
+      >
+        <a class="rounded-xl px-4 py-3 text-[#4f62c8]" routerLink="/vativa-home" (click)="closeMenu()">Home</a>
+        <a class="rounded-xl px-4 py-3 hover:bg-[#f7f7f7]" routerLink="/about-us" (click)="closeMenu()">About Us</a>
+        <a class="rounded-xl px-4 py-3 hover:bg-[#f7f7f7]" href="#services" (click)="closeMenu()">Our Service</a>
+        <a class="rounded-xl px-4 py-3 hover:bg-[#f7f7f7]" routerLink="/plans" (click)="closeMenu()">Plans</a>
+        <a class="rounded-xl px-4 py-3 hover:bg-[#f7f7f7]" routerLink="/contact-us" (click)="closeMenu()">Contact Us</a>
+        <a class="rounded-xl px-4 py-3 hover:bg-[#f7f7f7]" routerLink="/auth" [queryParams]="{ view: 'login' }" (click)="closeMenu()">Login</a>
+        <a class="rounded-xl px-4 py-3 hover:bg-[#f7f7f7]" routerLink="/auth" (click)="closeMenu()">Sign Up</a>
+        <a class="rounded-xl bg-[#5268d4] px-4 py-3 text-center text-white" routerLink="/contact-us" (click)="closeMenu()">
+          Ready For Your Queries
+        </a>
+      </nav>
+    }
+  </header>
+
+  <!-- ========== HERO ========== -->
+  <section class="mx-auto grid max-w-[1440px] items-center gap-10 px-5 pb-12 pt-5 sm:px-8 md:min-h-[780px] md:grid-cols-[0.9fr_1.1fr] md:gap-12 md:px-[6%] md:pb-16 md:pt-25">
+    <div class="order-2 flex flex-col items-start md:order-1">
+      <span class="rounded-full bg-[#f4f6ff] px-4 py-2 text-[11px] font-medium text-[#4f62c8]">
+        Our Support On LMS And E-Learning
+      </span>
+      <h1 class="mt-5 text-4xl font-semibold leading-[1.08] tracking-tight text-[#535353] sm:text-5xl lg:text-[58px]">
+        Pick &amp; Pay
+        <span class="block text-[#6079e8]">In Your Way</span>
+      </h1>
+      <p class="mt-5 max-w-[440px] text-sm leading-6 text-[#656565] sm:text-base">
+        You can now choose and pay only for the features you need in our LMS to experience the best-fit LMS.
+        Let’s PAP!! (Pick &amp; Pay)
+      </p>
+      <a
+        class="mt-6 inline-flex min-h-11 items-center gap-2 rounded-full bg-[#5268d4] px-6 text-xs font-medium text-white transition-colors hover:bg-[#455bc2] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#6079e8]"
+        href="#services"
+      >
+        Read More <span aria-hidden="true">›</span>
+      </a>
+      <p class="mt-10 text-xs text-[#666] md:mt-16">
+        We are always in connect with
+        <span class="ml-2 inline-flex items-center gap-2 font-semibold text-[#6b6b6b]" role="img" aria-label="Social networks">
+          <span aria-hidden="true">f</span>
+          <span aria-hidden="true">in</span>
+          <span aria-hidden="true">●</span>
+        </span>
+      </p>
+    </div>
+
+    <div class="group relative order-1 isolate mx-auto w-full md:order-2">
+
+      <div class="relative ml-[-10px] w-[98%] -translate-y-5">
+
+        <!-- Back layer -->
+        <div class="pointer-events-none absolute inset-0 rounded-[30px] bg-[#dfe3fb] opacity-0 transition-all duration-700 ease-in-out group-hover:opacity-100 group-hover:translate-x-2 group-hover:translate-y-1 group-hover:-rotate-[7deg] group-hover:scale-[1.04]"></div>
+
+        <!-- Middle layer -->
+        <div class="pointer-events-none absolute inset-0 rounded-[30px] bg-[#d0d6f8] opacity-0 transition-all duration-700 ease-in-out group-hover:opacity-100 group-hover:translate-x-1 group-hover:-rotate-[4deg] group-hover:scale-[1.02]"></div>
+
+        <!-- Front image -->
+        <div class="relative overflow-hidden rounded-[26px]">
+          <img ngSrc="/imgcomponent/vativa-home/learning-hero.png" width="768" height="786" priority
+            alt="A digital learning path connecting a laptop, courses, and learning devices"
+            class="aspect-[768/786] w-full object-cover" />
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Blue bar below hero -->
+  <div class="mx-auto mb-4 h-1.5 w-48 rounded-full bg-[#5268d4]"></div>
+
+
+<!-- ========== WHO WE ARE ========== -->
+<section class="px-[2.9%] py-16 lg:py-24" aria-labelledby="about-heading">
+  <div class="relative mx-auto max-w-[1356px] overflow-hidden rounded-[min(3.9vw,56px)] bg-[#1e3032] text-white shadow-[0_14px_14px_rgba(0,0,0,0.3)]">
+    <img
+      ngSrc="/imgcomponent/vativa-home/team-story.png"
+      width="1356"
+      height="717"
+      alt="VativaHub teammates gathered around a board displaying the word Team"
+      class="min-h-[380px] w-full scale-[1.05] object-cover md:aspect-[1356/717] md:min-h-0"
+    />
+    <!-- bar background illa: image la irukkura bar dhaan theriyum -->
+    <div class="absolute inset-x-0 bottom-0 bg-transparent pl-[min(2.67vw,38px)] pr-[min(3.8vw,55px)] pb-[min(2vw,28px)]">
+      
+      <p class="mt-[min(1vw,14px)] max-w-[min(85.5vw,1215px)] text-[min(1.44vw,20.5px)] leading-[min(1.8vw,26px)] text-white">
+        We provide End-to-End E-learning solutions for individual trainers and supports them in converting
+        Face-to-Face training into online formats. Our LMS is at the core of our services—built to simplify
+        and elevate your online training
+        <a class="ml-1 text-[min(.97vw,14px)] underline underline-offset-2 transition-opacity hover:opacity-75" routerLink="/about-us">
+          
+        </a>
+      </p>
+    </div>
+  </div>
+</section>
+  <!-- ========== OUR SERVICES ========== -->
+  <section id="services" class="scroll-mt-8 overflow-hidden" aria-labelledby="services-heading">
+    <div class="px-5 md:px-[5.3%]">
+      <h2 id="services-heading" class="text-center text-4xl font-bold leading-none text-[#5068d9] md:text-[60px]">
+        Our Services
+      </h2>
+      <p class="mt-7 text-base leading-[1.4] text-[#4d4d4d] md:text-[22px] md:leading-[31px]">
+        Our all-in-one solution is perfect for starting your e-learning journey. With us, you’ll have everything you need,
+        whether it’s creating courses or hosting them on our LMS platform. We’ll be there for you at every step, guaranteeing
+        your success.
+      </p>
+    </div>
+
+    <div class="mt-[62px] grid">
+
+      <!-- ===== CAROUSEL ===== -->
+      <div
+        class="col-start-1 row-start-1 transition-all duration-500 ease-in-out"
+        [class]="servicePanelOpen() ? 'pointer-events-none scale-95 opacity-0' : 'scale-100 opacity-100'"
+      >
+        <div class="relative h-[min(78vw,452px)] w-full">
+          @for (service of services; track service.title; let index = $index) {
+            <button
+              type="button"
+              class="absolute left-1/2 top-1/2 aspect-square w-[min(78vw,452px)] -translate-x-1/2 -translate-y-1/2 cursor-pointer overflow-hidden rounded-[60px] text-left transition-all duration-700 ease-in-out focus-visible:outline-4 focus-visible:outline-offset-4 focus-visible:outline-[#6079e8]"
+              [class]="service.cardClass"
+              [style.background-color]="serviceColors()[index] || null"
+              [style.transform]="serviceCardTransform(index)"
+              [style.z-index]="serviceCardZIndex(index)"
+              [attr.aria-label]="service.cardTitle"
+              (click)="onCardClick(index)"
+            >
+              <img
+                [ngSrc]="service.image"
+                width="452"
+                height="452"
+                [alt]="service.imageAlt"
+                class="absolute inset-0 h-full w-full object-cover"
+              />
+              
+            </button>
+          }
+        </div>
+
+        <!-- Dots -->
+        <div class="mt-[43px] flex items-center justify-center gap-[18px]">
+          @for (service of services; track service.title; let index = $index) {
+            <button
+              type="button"
+              class="h-1.5 w-1.5 cursor-pointer rounded-full transition-colors duration-300"
+              [class]="selectedServiceIndex() === index ? 'bg-[#5068d9]' : 'bg-[#d9d9d9]'"
+              [attr.aria-label]="'Show ' + service.title"
+              (click)="selectService(index)"
+            ></button>
+          }
+        </div>
+      </div>
+
+      <!-- ===== PANEL ===== -->
+      <div
+        class="col-start-1 row-start-1 transition-all duration-500 ease-in-out"
+        [class]="servicePanelOpen() ? 'scale-100 opacity-100' : 'pointer-events-none scale-90 opacity-0'"
+      >
+        <div class="relative h-[640px] md:ml-[6.2%] md:h-[636px]" (wheel)="onPanelWheel($event)">
+
+          <!-- Vertical tabs -->
+          <div class="absolute left-0 top-[106px] h-[422px] w-12 overflow-hidden md:w-32">
+            @for (idx of tabOrder; track idx) {
+              <button
+                type="button"
+                class="absolute left-1/2 top-0 cursor-pointer whitespace-nowrap rotate-180 text-[15px] transition-all duration-700 ease-in-out [writing-mode:vertical-rl]"
+                [class]="tabOffset(idx) === 0 ? 'text-[#222]' : 'text-[#8a8a8a]'"
+                [style.transform]="'translate(-50%, calc(' + tabY(idx) + 'px - 50%))'"
+                (click)="selectService(idx)"
+              >
+                {{ services[idx].tab }}
+              </button>
+            }
+          </div>
+
+          <!-- Sliding panels (right edge varaikkum) -->
+          <div class="absolute inset-y-0 left-12 right-0 overflow-hidden md:left-[131px]">
+            @for (service of services; track service.title; let index = $index) {
+              <article
+                class="absolute left-0 top-0 flex h-[600px] w-full flex-col items-center justify-center gap-4 rounded-bl-lg rounded-tl-[90px] transition-transform duration-700 ease-in-out md:grid md:h-[502px] md:grid-cols-[476px_1fr] md:gap-x-[33px] md:rounded-tl-[135px]"
+                [class]="service.panelClass"
+                [style.background-color]="serviceColors()[index] || null"
+                [style.transform]="'translateY(' + tabOffset(index) * 742 + 'px)'"
+                [attr.aria-hidden]="tabOffset(index) !== 0"
+              >
+                <button
+                  type="button"
+                  class="absolute right-6 top-[50px] cursor-pointer text-[20px] font-semibold"
+                  (click)="closeServicePanel()"
+                >
+                  Close
+                </button>
+
+                <img
+                  [ngSrc]="service.panelImage"
+                  width="430"
+                  height="370"
+                  [alt]="service.imageAlt"
+                  class="max-h-[260px] w-full max-w-[340px] object-contain md:max-h-[370px] md:max-w-[430px] md:justify-self-center"
+                />
+
+                <div class="px-6 pb-6 md:px-0 md:pb-0 md:pr-[30px]">
+                  <h3 class="text-[28px] font-medium leading-[46px] md:text-[38px]">{{ service.title }}</h3>
+                  <p class="mt-7 text-base leading-[26px] md:text-[18px]">{{ service.description }}</p>
+                </div>
+              </article>
+            }
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+
+  <!-- ========== OUR TRUSTED PARTNERS ========== -->
+<section class="mx-auto max-w-[1422px] pb-[min(2.8vw,40px)] pt-[min(1vw,10px)]" aria-labelledby="partners-heading">
+  <h2 id="partners-heading" class="text-center text-[min(4.22vw,60px)] font-bold leading-[1.1] text-[#5169db]">
+    Our Trusted Partners
+  </h2>
+  <img
+    ngSrc="/imgcomponent/vativa-home/partner-logos-row-1.png"
+    width="1626" height="68" alt="Partner organizations"
+    class="mt-[min(5.6vw,80px)] block h-auto w-full"
+  />
+  <img
+    ngSrc="/imgcomponent/vativa-home/partner-logos-row-2.png"
+    width="1626" height="102" alt="More VativaHub partners"
+    class="mt-[min(3.5vw,50px)] block h-auto w-full"
+  />
+</section>
+
+<!-- ========== TESTIMONIALS ========== -->
+
+<section class="relative mx-auto aspect-[1422/770] w-full max-w-[1422px] overflow-hidden font-['DM_Sans',sans-serif]" aria-labelledby="testimonial-heading">
+  <!-- peach card -->
+  <div class="absolute left-[5.13%] top-[10.9%] h-[85.2%] w-[43.8%] rounded-[min(4.5vw,64px)] bg-[#fdf6f1]"></div>
+
+  <!-- quote mark -->
+<svg
+  aria-hidden="true"
+  viewBox="0 0 185 127"
+  class="absolute left-[8.3%] top-[2%] w-[180px] overflow-visible"
+  fill="#606BE8"
+>
+  <path d="M69 8 C45 12 26 31 16 53 C8 72 9 94 20 108 C30 121 49 125 65 116 C81 107 88 89 83 71 C79 57 66 48 50 47 C49 31 57 17 69 8 Z" />
+<path d="M161 8 C137 12 118 31 108 53 C100 72 101 94 112 108 C122 121 141 125 157 116 C173 107 180 89 175 71 C171 57 158 48 142 47 C141 31 149 17 161 8 Z" />
+</svg>
+
+  <h2 id="testimonial-heading" class="absolute left-[7.67%] top-[30.1%] text-[min(3.94vw,56px)] font-bold leading-[1.286] text-[#6178dc]">
+    What Our Clients<br />Are Saying
+  </h2>
+
+  <!-- slides clip area (left: page edge, right: 96%) -->
+  <div class="absolute inset-y-0 left-0 right-[4%] overflow-hidden">
+    <div
+      class="absolute left-[5.34%] top-[54.7%] flex transition-transform duration-[900ms] ease-[cubic-bezier(.65,0,.35,1)]"
+      [style.width.%]="testimonialLoop.length * 49.59"
+      [style.transform]="'translateX(' + (-tIndex() * 100 / testimonialLoop.length) + '%)'"
+      [style.transition]="tAnimate() ? null : 'none'"
+    >
+      @for (t of testimonialLoop; track $index) {
+        <figure class="m-0 min-w-0 flex-1 pl-[min(2.95vw,42px)]" [attr.aria-hidden]="$index >= testimonials.length">
+          <div class="flex h-[min(8.72vw,124px)] w-[88.2%] items-end">
+            <blockquote class="m-0 text-[min(1.55vw,22px)] leading-[min(2.18vw,31px)] text-[#444]">
+              {{ t.quote }}
+            </blockquote>
+          </div>
+          <figcaption class="mt-[min(3.66vw,52px)] flex items-center gap-[min(1.48vw,21px)]">
+            <span class="h-[min(5.63vw,80px)] w-[min(5.63vw,80px)] shrink-0 rounded-full bg-[#696969]"></span>
+            <span class="text-[min(1.13vw,16px)] text-[#444]">
+              <b class="block text-[min(1.41vw,20px)] font-medium text-[#111]">{{ t.name }}</b>
+              {{ t.place }}
+            </span>
+          </figcaption>
+        </figure>
+      }
+    </div>
+  </div>
+</section>
+<!-- ========== FAQ ========== -->
+<section #faqSection class="relative mx-auto aspect-[1422/540] w-full max-w-[1422px] font-['DM_Sans',sans-serif]" aria-labelledby="faq-heading">
+  <h2 id="faq-heading" class="pt-[min(4.36vw,62px)] text-center text-[min(4.5vw,64px)] font-bold text-[#5169db]">FAQ’s</h2>
+
+  <div class="absolute left-0 top-[39.3%] h-[46.7%] w-full overflow-hidden">
+    <!-- 2 pages side by side: [page 2: cards 4-6 + ▶] [page 1: ◀ + cards 1-3] -->
+    <div
+      class="flex h-full w-[200%] transition-transform duration-[800ms] ease-[cubic-bezier(.65,0,.35,1)] motion-reduce:transition-none"
+      [class]="faqSet() === 0 ? '-translate-x-1/2' : 'translate-x-0'"
+    >
+
+      <!-- PAGE 2 (cards 4,5,6) with ▶ button -->
+      <div class="relative h-full w-1/2 shrink-0">
+        <div class="absolute left-[1.13%] top-[4%] flex gap-[min(2.25vw,32px)]">
+          @for (faq of faqCards.slice(3); track faq.highlight; let i = $index) {
+            <article
+              tabindex="0"
+              class="relative flex h-[min(16.6vw,236px)] w-[min(28.14vw,400px)] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-[min(2.8vw,40px)] bg-[#f4f4f4] text-center shadow-[0_4px_6px_rgba(0,0,0,0.14)] outline-offset-4 transition-colors duration-500 hover:bg-[#f9f9f9]"
+              (mouseenter)="hoverFaq(i + 3)"
+              (mouseleave)="leaveFaq()"
+              (focus)="hoverFaq(i + 3)"
+              (blur)="leaveFaq()"
+            >
+              <p class="m-0 w-[57.5%] text-[min(1.55vw,22px)] font-medium leading-[min(2.18vw,31px)] text-[#444] transition-opacity duration-500 motion-reduce:transition-none"
+                 [class.opacity-0]="faqPos() === i + 3">
+                {{ faq.before }} <em class="not-italic text-[#677ee2]">{{ faq.highlight }}</em>
+              </p>
+              <span aria-hidden="true"
+                class="absolute inset-0 flex items-center justify-center bg-[#677ee2] text-[min(3.94vw,56px)] font-bold italic text-white transition-opacity duration-500 motion-reduce:transition-none"
+                [class]="faqPos() === i + 3 ? 'opacity-100' : 'opacity-0'">
+                {{ faq.answer }}
+              </span>
+            </article>
+          }
+        </div>
+        <button type="button" aria-label="Show first questions" (click)="toggleFaqSet()"
+          class="absolute right-[3.8%] top-[50.8%] flex h-[min(3.66vw,52px)] w-[min(3.66vw,52px)] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-[#eeeef3] text-[min(1.2vw,17px)] text-[#677ee2] transition-colors duration-300 hover:bg-[#e0e3f7]">
+          ▶
+        </button>
+      </div>
+
+      <!-- PAGE 1 (cards 1,2,3) with ◀ button -->
+      <div class="relative h-full w-1/2 shrink-0">
+        <button type="button" aria-label="Show more questions" (click)="toggleFaqSet()"
+          class="absolute left-[2.6%] top-[50.8%] flex h-[min(3.66vw,52px)] w-[min(3.66vw,52px)] -translate-y-1/2 cursor-pointer items-center justify-center rounded-full bg-[#eeeef3] text-[min(1.2vw,17px)] text-[#677ee2] transition-colors duration-300 hover:bg-[#e0e3f7]">
+          ◀
+        </button>
+        <div class="absolute left-[8.51%] top-[4%] flex gap-[min(2.25vw,32px)]">
+          @for (faq of faqCards.slice(0, 3); track faq.highlight; let i = $index) {
+            <article
+              tabindex="0"
+              class="relative flex h-[min(16.6vw,236px)] w-[min(28.14vw,400px)] shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-[min(2.8vw,40px)] bg-[#f4f4f4] text-center shadow-[0_4px_6px_rgba(0,0,0,0.14)] outline-offset-4 transition-colors duration-500 hover:bg-[#f9f9f9]"
+              (mouseenter)="hoverFaq(i)"
+              (mouseleave)="leaveFaq()"
+              (focus)="hoverFaq(i)"
+              (blur)="leaveFaq()"
+            >
+              <p class="m-0 w-[57.5%] text-[min(1.55vw,22px)] font-medium leading-[min(2.18vw,31px)] text-[#444] transition-opacity duration-500 motion-reduce:transition-none"
+                 [class.opacity-0]="faqPos() === i">
+                {{ faq.before }} <em class="not-italic text-[#677ee2]">{{ faq.highlight }}</em>
+              </p>
+              <span aria-hidden="true"
+                class="absolute inset-0 flex items-center justify-center bg-[#677ee2] text-[min(3.94vw,56px)] font-bold italic text-white transition-opacity duration-500 motion-reduce:transition-none"
+                [class]="faqPos() === i ? 'opacity-100' : 'opacity-0'">
+                {{ faq.answer }}
+              </span>
+            </article>
+          }
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ========== FOOTER ========== -->
+<footer class="bg-[#f4f4f4] pb-[min(2.8vw,40px)] text-center font-['DM_Sans',sans-serif]">
+
+  <!-- Legal links -->
+  <nav
+    class="flex flex-wrap justify-center gap-x-[clamp(14px,5.3vw,75px)] gap-y-2 px-5 pt-[min(2.67vw,38px)] text-[clamp(12px,1.41vw,20px)] font-medium text-[#9b9b9b]"
+    aria-label="Legal links"
+  >
+    <a class="transition-colors hover:text-[#5268d4]" routerLink="/terms-and-conditions">Term &amp; Conditions</a>
+    <a class="transition-colors hover:text-[#5268d4]" routerLink="/privacy-policy">Privacy Policy</a>
+    <a class="transition-colors hover:text-[#5268d4]" routerLink="/refund-cancellation">Refund &amp; Cancellation</a>
+    <a class="transition-colors hover:text-[#5268d4]" routerLink="/plan-policy">Plan Policy</a>
+  </nav>
+
+  <!-- Social -->
+  <div class="mt-[min(1.83vw,26px)] flex items-center justify-center gap-[min(1.3vw,18px)] text-[clamp(10px,.92vw,13px)] text-[#9b9b9b]">
+    <span>We are always in connect with</span>
+
+    <div class="flex items-center gap-[min(1.2vw,17px)] text-[#8b8b8b]">
+      <!-- Facebook -->
+      <a href="https://www.facebook.com/" target="_blank" rel="noopener noreferrer" aria-label="Facebook"
+         class="block h-[min(1.76vw,25px)] w-[min(1.76vw,25px)] transition-colors hover:text-[#5268d4]">
+        <svg viewBox="0 0 24 24" class="h-full w-full" aria-hidden="true">
+          <circle cx="12" cy="12" r="12" fill="currentColor" />
+          <text x="13.2" y="21" text-anchor="middle" font-size="22" font-weight="700" fill="#f4f4f4" font-family="DM Sans, sans-serif">f</text>
+        </svg>
+      </a>
+
+      <!-- LinkedIn -->
+      <a href="https://www.linkedin.com/" target="_blank" rel="noopener noreferrer" aria-label="LinkedIn"
+         class="block h-[min(1.62vw,23px)] w-[min(1.62vw,23px)] transition-colors hover:text-[#5268d4]">
+        <svg viewBox="0 0 24 24" class="h-full w-full" aria-hidden="true">
+          <rect width="24" height="24" rx="4" fill="currentColor" />
+          <text x="12" y="18.5" text-anchor="middle" font-size="15" font-weight="700" fill="#f4f4f4" font-family="DM Sans, sans-serif">in</text>
+        </svg>
+      </a>
+
+      <!-- WhatsApp -->
+      <a href="https://wa.me/" target="_blank" rel="noopener noreferrer" aria-label="WhatsApp"
+         class="block h-[min(1.69vw,24px)] w-[min(1.69vw,24px)] transition-colors hover:text-[#5268d4]">
+        <svg viewBox="0 0 24 24" class="h-full w-full" aria-hidden="true">
+          <path d="M12 0.5C5.65 0.5 0.5 5.65 0.5 12c0 2.1.57 4.07 1.56 5.77L0.5 23.5l5.88-1.54A11.46 11.46 0 0 0 12 23.5c6.35 0 11.5-5.15 11.5-11.5S18.35 0.5 12 0.5z" fill="currentColor" />
+          <g transform="translate(5.2 5.2) scale(.6)">
+            <path fill="#f4f4f4" d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z" />
+          </g>
+        </svg>
+      </a>
+    </div>
+  </div>
+
+  <!-- Copyright -->
+  <p class="mt-[min(1.9vw,27px)] text-[clamp(10px,.98vw,14px)] text-[#9b9b9b]">
+    VativaHub <span class="ml-[min(.9vw,13px)]">2026</span>
+  </p>
+</footer>
