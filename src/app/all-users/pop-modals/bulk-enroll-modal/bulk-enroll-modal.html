@@ -1,0 +1,74 @@
+<div class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-5 backdrop-blur-[4px]" (click)="close()">
+  <section
+    class="relative w-full max-w-[480px] rounded-3xl bg-white p-8 pt-9 shadow-[0_10px_30px_rgba(0,0,0,.25)]"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="bulk-enroll-title"
+    (click)="$event.stopPropagation()"
+  >
+    <button
+      type="button"
+      (click)="close()"
+      [disabled]="submitting()"
+      class="absolute right-0 top-0 grid h-11 w-11 cursor-pointer place-items-center rounded-tr-3xl rounded-bl-2xl bg-[#F7635B] text-white shadow-md transition hover:bg-[#e5544c] disabled:cursor-not-allowed disabled:opacity-50"
+      aria-label="Close"
+    >
+      <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+
+    <h2 id="bulk-enroll-title" class="pr-12 text-xl font-semibold text-[#505050]">
+      {{ isEnroll() ? 'Enroll in course' : 'Unenroll from course' }}
+    </h2>
+    <p class="mt-1 text-xs text-[#6b6b6b]">
+      {{ userIds().length }} selected user(s) will be {{ isEnroll() ? 'enrolled in' : 'removed from' }} the course you choose
+    </p>
+
+    <label for="bulk-course" class="mt-5 block text-xs font-medium text-[#505050]">
+      Course<span class="text-red-500">*</span>
+    </label>
+    <select
+      id="bulk-course"
+      (change)="selectCourse($event)"
+      [disabled]="loadingCourses() || submitting() || !!result()"
+      class="mt-2 h-11 w-full cursor-pointer rounded-xl bg-[#f6f6f6] px-4 text-xs text-[#505050] outline-none focus-visible:outline-2 focus-visible:outline-[#4694A4] disabled:opacity-60"
+    >
+      <option value="">{{ loadingCourses() ? 'Loading courses…' : courses().length ? 'Select a course' : 'No courses found' }}</option>
+      @for (c of courses(); track c.id) {
+        <option [value]="c.id">{{ c.name }}{{ c.status === 'DRAFT' ? ' (Draft)' : '' }}</option>
+      }
+    </select>
+
+    @if (error()) {
+      <p class="mt-3 text-xs text-red-500" role="alert" aria-live="polite">{{ error() }}</p>
+    }
+
+    @if (result(); as r) {
+      <div class="mt-4 rounded-xl bg-[#f6f6f6] p-4 text-xs" aria-live="polite">
+        <p>
+          <b>{{ r.affected }}</b> of {{ r.requested }} user(s) {{ isEnroll() ? 'enrolled in' : 'unenrolled from' }}
+          <b>{{ r.courseName }}</b>, <b class="text-red-500">{{ r.skipped.length }}</b> skipped.
+        </p>
+        <ul class="mt-2 max-h-32 list-disc overflow-y-auto pl-4">
+          @for (s of r.skipped; track s.userId) {
+            <li>{{ s.name || 'User #' + s.userId }} - {{ s.reason }}</li>
+          }
+        </ul>
+      </div>
+    }
+
+    <div class="mt-6 flex justify-center gap-3">
+      <button type="button" (click)="close()" [disabled]="submitting()"
+              class="h-11 w-36 cursor-pointer rounded-xl bg-[#f0f0f0] text-sm text-[#505050] transition hover:bg-[#e6e6e6] disabled:opacity-50">
+        {{ result() ? 'Close' : 'Cancel' }}
+      </button>
+      @if (!result()) {
+        <button type="button" (click)="submit()" [disabled]="courseId() === null || submitting()"
+                class="h-11 w-36 cursor-pointer rounded-xl bg-[#4694A4] text-sm text-white transition hover:bg-[#3b8393] disabled:cursor-not-allowed disabled:opacity-50">
+          {{ submitting() ? 'Please wait…' : isEnroll() ? 'Enroll' : 'Unenroll' }}
+        </button>
+      }
+    </div>
+  </section>
+</div>

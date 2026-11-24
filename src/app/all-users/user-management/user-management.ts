@@ -5,14 +5,15 @@ import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { AuthService, FEATURE } from '../../services/auth';
 import { BulkImportModal } from '../pop-modals/bulk-import-modal/bulk-import-modal';
-import { ImportResult, ManagedUser, UserManagementService, UserStatus } from '../../services/user-management.service';
+import { BulkEnrollModal } from '../pop-modals/bulk-enroll-modal/bulk-enroll-modal';
+import { BulkEnrollResult, ImportResult, ManagedUser, UserManagementService, UserStatus } from '../../services/user-management.service';
 
 type RowAction = 'suspend' | 'active' | 'inactive' | 'delete';
 type BulkAction = 'import' | 'export' | 'enroll' | 'unenroll' | 'delete';
 
 @Component({
   selector: 'app-user-management',
-  imports: [ReactiveFormsModule, BulkImportModal],
+  imports: [ReactiveFormsModule, BulkImportModal, BulkEnrollModal],
   templateUrl: './user-management.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -32,6 +33,7 @@ export class UserManagement implements OnInit {
   protected readonly pendingAction = signal<RowAction | null>(null);
   protected readonly bulkOpen = signal(false);
   protected readonly importOpen = signal(false);
+  protected readonly enrollMode = signal<'enroll' | 'unenroll' | null>(null);
   protected readonly toast = signal('');
 
   protected readonly dates = new FormGroup({
@@ -42,6 +44,7 @@ export class UserManagement implements OnInit {
   protected readonly allSelected = computed(
     () => this.users().length > 0 && this.selected().size === this.users().length,
   );
+  protected readonly selectedIds = computed(() => [...this.selected()]);
   protected readonly someSelected = computed(() => this.selected().size > 0 && !this.allSelected());
 
   protected readonly bulkItems: readonly { id: BulkAction; label: string }[] = [
@@ -54,12 +57,19 @@ export class UserManagement implements OnInit {
 
   protected readonly visibleBulkItems = computed(() =>
     this.bulkItems.filter(
-      (i) => (i.id !== 'delete' || this.canDelete()) && (i.id !== 'import' || this.canUpdate()),
+      (i) =>
+        (i.id !== 'delete' || this.canDelete()) &&
+        (i.id !== 'import' || this.canUpdate()) &&
+        (i.id !== 'enroll' || this.canEnroll()) &&
+        (i.id !== 'unenroll' || this.canUnenroll()),
     ),
   );
 
   /** Package / role permission on "All Users": update = edit profile + status, delete = delete users. */
   protected readonly canUpdate = computed(() => this.auth.can(FEATURE.USER_ALL, 'update'));
+  /** Enrollment permission (same feature as the course page): create = enroll, delete = unenroll. */
+  protected readonly canEnroll = computed(() => this.auth.can(FEATURE.ENROLL_UNENROLL, 'create'));
+  protected readonly canUnenroll = computed(() => this.auth.can(FEATURE.ENROLL_UNENROLL, 'delete'));
   protected readonly canDelete = computed(() => this.auth.can(FEATURE.USER_ALL, 'delete'));
 
   private readonly allRowActions: readonly { id: RowAction; label: string }[] = [
@@ -187,6 +197,11 @@ export class UserManagement implements OnInit {
       if (this.canUpdate()) this.importOpen.set(true);
       return;
     }
+    if (action === 'enroll' || action === 'unenroll') {
+      if (!ids.length) return this.notify('Select at least one user first');
+      this.enrollMode.set(action);
+      return;
+    }
     if (action === 'export') {
       const rows = this.users().filter((u) => !ids.length || ids.includes(u.id));
       const csv = [
@@ -201,7 +216,12 @@ export class UserManagement implements OnInit {
       URL.revokeObjectURL(url);
       return this.notify('Users exported');
     }
-    this.notify('This bulk action will be connected to the backend soon');
+  }
+
+  protected onEnrolled(r: BulkEnrollResult): void {
+    const verb = this.enrollMode() === 'unenroll' ? 'unenrolled from' : 'enrolled in';
+    this.notify(`${r.affected} user(s) ${verb} ${r.courseName}`);
+    if (r.skipped.length === 0) this.selected.set(new Set());
   }
 
   protected onImported(r: ImportResult): void {

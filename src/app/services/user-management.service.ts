@@ -30,6 +30,26 @@ export interface ImportResult {
   errors: ImportRowError[];
 }
 
+export interface CourseOption {
+  id: number;
+  name: string;
+  status: string;
+}
+
+export interface BulkEnrollSkipped {
+  userId: number;
+  name: string | null;
+  reason: string;
+}
+
+export interface BulkEnrollResult {
+  courseId: number;
+  courseName: string;
+  requested: number;
+  affected: number;
+  skipped: BulkEnrollSkipped[];
+}
+
 interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -124,5 +144,25 @@ export class UserManagementService {
         if (r.imported > 0) this.load().subscribe();
       }),
     );
+  }
+
+  // ---------- Bulk enroll / unenroll (All Users > Bulk Users) ----------
+
+  loadCourseOptions(): Observable<CourseOption[]> {
+    return this.http
+      .get<ApiResponse<CourseOption[]>>(`${this.apiUrl}/bulk-enrollment/courses`)
+      .pipe(map((res) => res.data));
+  }
+
+  bulkEnroll(courseId: number, userIds: readonly number[]): Observable<BulkEnrollResult> {
+    return this.http
+      .post<ApiResponse<BulkEnrollResult>>(`${this.apiUrl}/bulk-enrollment/enroll`, { courseId, userIds })
+      .pipe(map((res) => res.data));
+  }
+
+  bulkUnenroll(courseId: number, userIds: readonly number[]): Observable<BulkEnrollResult> {
+    return this.http
+      .post<ApiResponse<BulkEnrollResult>>(`${this.apiUrl}/bulk-enrollment/unenroll`, { courseId, userIds })
+      .pipe(map((res) => res.data));
   }
 }
