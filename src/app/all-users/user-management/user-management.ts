@@ -4,14 +4,15 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { AuthService, FEATURE } from '../../services/auth';
-import { ManagedUser, UserManagementService, UserStatus } from '../../services/user-management.service';
+import { BulkImportModal } from '../pop-modals/bulk-import-modal/bulk-import-modal';
+import { ImportResult, ManagedUser, UserManagementService, UserStatus } from '../../services/user-management.service';
 
 type RowAction = 'suspend' | 'active' | 'inactive' | 'delete';
 type BulkAction = 'import' | 'export' | 'enroll' | 'unenroll' | 'delete';
 
 @Component({
   selector: 'app-user-management',
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, BulkImportModal],
   templateUrl: './user-management.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -30,6 +31,7 @@ export class UserManagement implements OnInit {
   protected readonly menuUserId = signal<number | null>(null);
   protected readonly pendingAction = signal<RowAction | null>(null);
   protected readonly bulkOpen = signal(false);
+  protected readonly importOpen = signal(false);
   protected readonly toast = signal('');
 
   protected readonly dates = new FormGroup({
@@ -51,7 +53,9 @@ export class UserManagement implements OnInit {
   ];
 
   protected readonly visibleBulkItems = computed(() =>
-    this.bulkItems.filter((i) => i.id !== 'delete' || this.canDelete()),
+    this.bulkItems.filter(
+      (i) => (i.id !== 'delete' || this.canDelete()) && (i.id !== 'import' || this.canUpdate()),
+    ),
   );
 
   /** Package / role permission on "All Users": update = edit profile + status, delete = delete users. */
@@ -179,6 +183,10 @@ export class UserManagement implements OnInit {
         });
       return;
     }
+    if (action === 'import') {
+      if (this.canUpdate()) this.importOpen.set(true);
+      return;
+    }
     if (action === 'export') {
       const rows = this.users().filter((u) => !ids.length || ids.includes(u.id));
       const csv = [
@@ -194,6 +202,10 @@ export class UserManagement implements OnInit {
       return this.notify('Users exported');
     }
     this.notify('This bulk action will be connected to the backend soon');
+  }
+
+  protected onImported(r: ImportResult): void {
+    this.notify(`${r.imported} user(s) imported`);
   }
 
   private errorText(error: HttpErrorResponse, fallback: string): string {

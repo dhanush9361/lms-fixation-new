@@ -136,6 +136,10 @@
       </div>
     </section>
 
+    @if (importOpen()) {
+      <app-bulk-import-modal (closed)="importOpen.set(false)" (imported)="onImported($event)" />
+    }
+
     @if (toast()) {
       <div class="um-pop fixed right-8 top-24 z-50 rounded-xl bg-[#61b7c5] px-5 py-3 text-sm text-white shadow-lg" role="status">{{ toast() }}</div>
     }

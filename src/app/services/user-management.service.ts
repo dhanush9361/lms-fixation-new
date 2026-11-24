@@ -16,6 +16,20 @@ export interface ManagedUser {
   suspendTo?: string | null;
 }
 
+export interface ImportRowError {
+  row: number;
+  email: string;
+  reason: string;
+}
+
+export interface ImportResult {
+  total: number;
+  imported: number;
+  failed: number;
+  emailsFailed: number;
+  errors: ImportRowError[];
+}
+
 interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -92,6 +106,23 @@ export class UserManagementService {
         this.total.update((n) => Math.max(0, n - ids.length));
       }),
       map(() => undefined),
+    );
+  }
+
+  /** Sample .xlsx for Bulk Users > Import users. */
+  downloadTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/import/template`, { responseType: 'blob' });
+  }
+
+  /** Uploads the filled .xlsx; imported users are stored in the users table, then the list is reloaded. */
+  importUsers(file: File): Observable<ImportResult> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<ApiResponse<ImportResult>>(`${this.apiUrl}/import`, body).pipe(
+      map((res) => res.data),
+      tap((r) => {
+        if (r.imported > 0) this.load().subscribe();
+      }),
     );
   }
 }
