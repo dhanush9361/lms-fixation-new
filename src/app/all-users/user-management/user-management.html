@@ -32,8 +32,9 @@
     </header>
 
     <!-- Table card -->
-    <section class="um-rise rounded-[20px] bg-white pb-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" style="animation-delay: 60ms" aria-label="Users table">
-      <div class="overflow-x-auto">
+    <section class="um-rise flex min-h-[calc(100vh-220px)] flex-col rounded-[20px] bg-white pb-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" style="animation-delay: 60ms" aria-label="Users table">
+      <!-- flex-1: the scroll area fills the whole white card, so the row menu has room -->
+      <div class="um-scroll flex-1 overflow-x-auto">
         <table class="w-full min-w-[860px] border-separate border-spacing-0 text-left text-xs">
           <thead>
             <tr class="[&>th]:border-b [&>th]:border-[#f0f0f0] [&>th]:py-6 [&>th]:text-[13px] [&>th]:font-medium">
@@ -87,7 +88,8 @@
 
                     @if (menuUserId() === u.id) {
                       <div role="dialog" [attr.aria-label]="'Actions for ' + u.username" (click)="$event.stopPropagation()"
-                           class="um-pop absolute right-9 top-[-14px] z-30 w-[140px] origin-top-right rounded-[18px] bg-[#f6f6f6] text-[10px] shadow-xl ring-1 ring-black/5">
+                           class="um-pop absolute right-9 z-30 w-[140px] rounded-[18px] bg-[#f6f6f6] text-[10px] shadow-xl ring-1 ring-black/5"
+                           [class.top-[-14px]]="!menuUp()" [class.bottom-[-14px]]="menuUp()">
                         @if (canUpdate()) {
                           <button type="button" (click)="editProfile(u)" class="block w-full cursor-pointer rounded-t-[18px] px-5 py-3 text-left transition hover:bg-[#ececec]">Edit Profile</button>
                         }
@@ -141,8 +143,12 @@
     }
 
     @if (enrollMode(); as mode) {
-      <app-bulk-enroll-modal [mode]="mode" [userIds]="selectedIds()"
-                             (closed)="enrollMode.set(null)" (done)="onEnrolled($event)" />
+      <app-bulk-enroll-modal [mode]="mode" (closed)="enrollMode.set(null)"
+                             (imported)="onEnrollImported($event)" (unenrolled)="onUnenrolled($event)" />
+    }
+
+    @if (deleteOpen()) {
+      <app-bulk-delete-modal (closed)="deleteOpen.set(false)" (deleted)="onDeleted($event)" />
     }
 
     @if (toast()) {

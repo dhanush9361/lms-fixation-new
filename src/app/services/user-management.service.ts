@@ -50,6 +50,30 @@ export interface BulkEnrollResult {
   skipped: BulkEnrollSkipped[];
 }
 
+export interface EnrollImportResult {
+  total: number;
+  usersCreated: number;
+  enrolled: number;
+  alreadyEnrolled: number;
+  failed: number;
+  emailsFailed: number;
+  errors: ImportRowError[];
+}
+
+export interface UnenrollImportResult {
+  total: number;
+  unenrolled: number;
+  failed: number;
+  errors: ImportRowError[];
+}
+
+export interface DeleteImportResult {
+  total: number;
+  deleted: number;
+  failed: number;
+  errors: ImportRowError[];
+}
+
 interface ApiResponse<T> {
   success: boolean;
   message: string;
@@ -129,6 +153,21 @@ export class UserManagementService {
     );
   }
 
+  /** Sample .xlsx for Bulk Users > Delete users. */
+  downloadDeleteTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/bulk-delete/template`, { responseType: 'blob' });
+  }
+
+  /** Uploads the filled .xlsx (one email per row): listed users of this company are deleted, other rows are reported. */
+  importDeletions(file: File): Observable<DeleteImportResult> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<ApiResponse<DeleteImportResult>>(`${this.apiUrl}/bulk-delete/import`, body).pipe(
+      map((res) => res.data),
+      tap(() => this.load().subscribe()),
+    );
+  }
+
   /** Sample .xlsx for Bulk Users > Import users. */
   downloadTemplate(): Observable<Blob> {
     return this.http.get(`${this.apiUrl}/import/template`, { responseType: 'blob' });
@@ -154,9 +193,34 @@ export class UserManagementService {
       .pipe(map((res) => res.data));
   }
 
-  bulkEnroll(courseId: number, userIds: readonly number[]): Observable<BulkEnrollResult> {
+  /** Sample .xlsx for Bulk Users > Enroll in course. */
+  downloadEnrollTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/bulk-enrollment/import/template`, { responseType: 'blob' });
+  }
+
+  /** Uploads the filled .xlsx: missing users are created, then every row's user is enrolled in its course. */
+  importEnrollments(file: File): Observable<EnrollImportResult> {
+    const body = new FormData();
+    body.append('file', file);
+    return this.http.post<ApiResponse<EnrollImportResult>>(`${this.apiUrl}/bulk-enrollment/import`, body).pipe(
+      map((res) => res.data),
+      tap((r) => {
+        if (r.usersCreated > 0) this.load().subscribe();
+      }),
+    );
+  }
+
+  /** Sample .xlsx for Bulk Users > Unenroll from course. */
+  downloadUnenrollTemplate(): Observable<Blob> {
+    return this.http.get(`${this.apiUrl}/bulk-enrollment/unenroll-import/template`, { responseType: 'blob' });
+  }
+
+  /** Uploads the filled .xlsx (email + course per row): matching enrollments are removed, other rows are reported. */
+  importUnenrollments(file: File): Observable<UnenrollImportResult> {
+    const body = new FormData();
+    body.append('file', file);
     return this.http
-      .post<ApiResponse<BulkEnrollResult>>(`${this.apiUrl}/bulk-enrollment/enroll`, { courseId, userIds })
+      .post<ApiResponse<UnenrollImportResult>>(`${this.apiUrl}/bulk-enrollment/unenroll-import`, body)
       .pipe(map((res) => res.data));
   }
 

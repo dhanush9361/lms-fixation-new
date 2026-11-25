@@ -1,80 +1,148 @@
 import { HttpErrorResponse } from '@angular/common/http';
-import { ChangeDetectionStrategy, Component, DestroyRef, OnInit, computed, inject, input, output, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, DestroyRef, computed, inject, input, output, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { BulkEnrollResult, CourseOption, UserManagementService } from '../../../services/user-management.service';
+import { EnrollImportResult, ImportRowError, UnenrollImportResult, UserManagementService } from '../../../services/user-management.service';
 
+const MAX_BYTES = 5 * 1024 * 1024;
+
+/**
+ * Bulk Users menu - enroll / unenroll work from an Excel sheet:
+ *  - mode 'enroll'   : user + course per row; missing users are created, then enrolled.
+ *  - mode 'unenroll' : email + course per row; the user is unenrolled only if he is enrolled in that course,
+ *                      every other row is reported with its reason.
+ */
 @Component({
   selector: 'app-bulk-enroll-modal',
   templateUrl: './bulk-enroll-modal.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: { '(document:keydown.escape)': 'close()' },
 })
-export class BulkEnrollModal implements OnInit {
+export class BulkEnrollModal {
   private readonly api = inject(UserManagementService);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly mode = input.required<'enroll' | 'unenroll'>();
-  readonly userIds = input.required<readonly number[]>();
 
   readonly closed = output<void>();
-  /** Emitted when at least one user was enrolled / unenrolled. */
-  readonly done = output<BulkEnrollResult>();
-
-  protected readonly courses = signal<CourseOption[]>([]);
-  protected readonly loadingCourses = signal(true);
-  protected readonly courseId = signal<number | null>(null);
-  protected readonly submitting = signal(false);
-  protected readonly error = signal<string | null>(null);
-  protected readonly result = signal<BulkEnrollResult | null>(null);
+  /** 'enroll': emitted when at least one user was enrolled / created. */
+  readonly imported = output<EnrollImportResult>();
+  /** 'unenroll': emitted when at least one enrollment was removed. */
+  readonly unenrolled = output<UnenrollImportResult>();
 
   protected readonly isEnroll = computed(() => this.mode() === 'enroll');
+  protected readonly file = signal<File | null>(null);
+  protected readonly submitting = signal(false);
+  protected readonly error = signal<string | null>(null);
+  protected readonly enrollResult = signal<EnrollImportResult | null>(null);
+  protected readonly unenrollResult = signal<UnenrollImportResult | null>(null);
 
-  ngOnInit(): void {
-    this.api
-      .loadCourseOptions()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (list) => {
-          this.courses.set(list);
-          this.loadingCourses.set(false);
-        },
-        error: () => {
-          this.loadingCourses.set(false);
-          this.error.set('Unable to load the courses. Please try again.');
-        },
-      });
-  }
+  protected readonly hasResult = computed(() => !!this.enrollResult() || !!this.unenrollResult());
+  /** Rejected rows of whichever result is showing. */
+  protected readonly failedRows = computed<ImportRowError[]>(
+    () => (this.enrollResult() ?? this.unenrollResult())?.errors ?? [],
+  );
 
   protected close(): void {
     if (!this.submitting()) this.closed.emit();
   }
 
-  protected selectCourse(event: Event): void {
-    const v = (event.target as HTMLSelectElement).value;
-    this.courseId.set(v ? Number(v) : null);
+  protected pick(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    const f = input.files?.[0] ?? null;
+    input.value = '';
+    this.error.set(null);
+    this.enrollResult.set(null);
+    this.unenrollResult.set(null);
+    if (!f) return;
+    if (!f.name.toLowerCase().endsWith('.xlsx')) {
+      this.file.set(null);
+      return this.error.set('Only .xlsx files are supported. Please use the sample template.');
+    }
+    if (f.size > MAX_BYTES) {
+      this.file.set(null);
+      return this.error.set('File is larger than 5 MB.');
+    }
+    this.file.set(f);
+  }
+
+  protected clear(): void {
+    this.file.set(null);
     this.error.set(null);
   }
 
-  protected submit(): void {
-    const id = this.courseId();
-    if (id == null) return void this.error.set('Please select a course.');
-    if (this.submitting()) return;
+  protected downloadTemplate(event: Event): void {
+    event.preventDefault();
+    const mode = this.mode();
+    (mode === 'enroll' ? this.api.downloadEnrollTemplate() : this.api.downloadUnenrollTemplate())
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (blob) => this.save(blob, `${mode}-users-template.xlsx`),
+        error: () => this.error.set('Unable to download the template. Please try again.'),
+      });
+  }
+
+  protected upload(): void {
+    const f = this.file();
+    if (!f || this.submitting()) return;
     this.submitting.set(true);
     this.error.set(null);
 
-    const call = this.isEnroll() ? this.api.bulkEnroll(id, this.userIds()) : this.api.bulkUnenroll(id, this.userIds());
-    call.pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
-      next: (r) => {
-        this.submitting.set(false);
-        this.result.set(r);
-        if (r.affected > 0) this.done.emit(r);
-        if (r.skipped.length === 0) this.closed.emit();
-      },
-      error: (e: HttpErrorResponse) => {
-        this.submitting.set(false);
-        const msg: unknown = e?.error?.message;
-        this.error.set(e.status >= 400 && e.status < 500 && typeof msg === 'string' ? msg : 'Something went wrong. Please try again.');
-      },
-    });
+    if (this.isEnroll()) {
+      this.api
+        .importEnrollments(f)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (r) => {
+            this.done();
+            this.enrollResult.set(r);
+            if (r.enrolled > 0 || r.usersCreated > 0) this.imported.emit(r);
+            if (r.failed === 0) this.closed.emit();
+          },
+          error: (e: HttpErrorResponse) => this.fail(e),
+        });
+    } else {
+      this.api
+        .importUnenrollments(f)
+        .pipe(takeUntilDestroyed(this.destroyRef))
+        .subscribe({
+          next: (r) => {
+            this.done();
+            this.unenrollResult.set(r);
+            if (r.unenrolled > 0) this.unenrolled.emit(r);
+            if (r.failed === 0) this.closed.emit();
+          },
+          error: (e: HttpErrorResponse) => this.fail(e),
+        });
+    }
+  }
+
+  private done(): void {
+    this.submitting.set(false);
+    this.file.set(null);
+  }
+
+  private fail(e: HttpErrorResponse): void {
+    this.submitting.set(false);
+    const msg: unknown = e?.error?.message;
+    this.error.set(
+      e.status >= 400 && e.status < 500 && typeof msg === 'string' ? msg : 'Upload failed. Please try again.',
+    );
+  }
+
+  protected downloadErrors(): void {
+    const rows = this.failedRows();
+    if (!rows.length) return;
+    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+    const csv = ['Row,Email,Reason', ...rows.map((e) => [e.row || '', esc(e.email), esc(e.reason)].join(','))].join('\n');
+    this.save(new Blob([csv], { type: 'text/csv' }), `${this.mode()}-users-errors.csv`);
+  }
+
+  private save(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = name;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 }

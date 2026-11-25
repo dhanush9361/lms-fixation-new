@@ -1,6 +1,6 @@
 <div class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-5 backdrop-blur-[4px]" (click)="close()">
   <section
-    class="relative w-full max-w-[480px] rounded-3xl bg-white p-8 pt-9 shadow-[0_10px_30px_rgba(0,0,0,.25)]"
+    class="relative w-full max-w-[520px] rounded-3xl bg-white p-8 pt-9 shadow-[0_10px_30px_rgba(0,0,0,.25)]"
     role="dialog"
     aria-modal="true"
     aria-labelledby="bulk-enroll-title"
@@ -19,56 +19,81 @@
     </button>
 
     <h2 id="bulk-enroll-title" class="pr-12 text-xl font-semibold text-[#505050]">
-      {{ isEnroll() ? 'Enroll in course' : 'Unenroll from course' }}
+      {{ isEnroll() ? 'Enroll users in courses' : 'Unenroll users from courses' }}
     </h2>
     <p class="mt-1 text-xs text-[#6b6b6b]">
-      {{ userIds().length }} selected user(s) will be {{ isEnroll() ? 'enrolled in' : 'removed from' }} the course you choose
+      @if (isEnroll()) {
+        Upload the Excel sheet with user details and course name. New users are created automatically, existing users are only enrolled.
+      } @else {
+        Upload the Excel sheet with email and course name. A user is unenrolled only if he is enrolled in that course, other rows are listed with the reason.
+      }
     </p>
 
-    <label for="bulk-course" class="mt-5 block text-xs font-medium text-[#505050]">
-      Course<span class="text-red-500">*</span>
-    </label>
-    <select
-      id="bulk-course"
-      (change)="selectCourse($event)"
-      [disabled]="loadingCourses() || submitting() || !!result()"
-      class="mt-2 h-11 w-full cursor-pointer rounded-xl bg-[#f6f6f6] px-4 text-xs text-[#505050] outline-none focus-visible:outline-2 focus-visible:outline-[#4694A4] disabled:opacity-60"
-    >
-      <option value="">{{ loadingCourses() ? 'Loading courses…' : courses().length ? 'Select a course' : 'No courses found' }}</option>
-      @for (c of courses(); track c.id) {
-        <option [value]="c.id">{{ c.name }}{{ c.status === 'DRAFT' ? ' (Draft)' : '' }}</option>
+
+    <div class="mt-5 flex items-center justify-between gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3">
+      <label for="bulk-file" class="shrink-0 text-xs text-[#505050]">Upload file<span class="text-red-500">*</span></label>
+      <span class="min-w-0 flex-1 truncate text-right text-xs text-[#8a8a8a]">{{ file()?.name ?? '' }}</span>
+      @if (file()) {
+        <button type="button" (click)="clear()" [disabled]="submitting()" aria-label="Remove file"
+                class="cursor-pointer text-xs text-[#F7635B]">✕</button>
       }
-    </select>
+      <input id="bulk-file" #fi type="file" class="sr-only" (change)="pick($event)"
+             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+      <button type="button" (click)="fi.click()" [disabled]="submitting()"
+              class="shrink-0 cursor-pointer rounded-lg bg-white px-4 py-2 text-[11px] shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#4694A4] disabled:opacity-50">
+        Choose a file
+      </button>
+    </div>
+
+    <p class="mt-4 text-xs text-[#505050]">
+      Here you can
+      <a href="#" (click)="downloadTemplate($event)" class="text-[#4694A4] underline">Download Sample Excel Template</a>
+    </p>
 
     @if (error()) {
       <p class="mt-3 text-xs text-red-500" role="alert" aria-live="polite">{{ error() }}</p>
     }
 
-    @if (result(); as r) {
+    @if (enrollResult(); as r) {
       <div class="mt-4 rounded-xl bg-[#f6f6f6] p-4 text-xs" aria-live="polite">
         <p>
-          <b>{{ r.affected }}</b> of {{ r.requested }} user(s) {{ isEnroll() ? 'enrolled in' : 'unenrolled from' }}
-          <b>{{ r.courseName }}</b>, <b class="text-red-500">{{ r.skipped.length }}</b> skipped.
+          <b>{{ r.enrolled }}</b> enrolled, <b>{{ r.usersCreated }}</b> new user(s) created,
+          {{ r.alreadyEnrolled }} already enrolled, <b class="text-red-500">{{ r.failed }}</b> failed (of {{ r.total }} rows).
         </p>
-        <ul class="mt-2 max-h-32 list-disc overflow-y-auto pl-4">
-          @for (s of r.skipped; track s.userId) {
-            <li>{{ s.name || 'User #' + s.userId }} - {{ s.reason }}</li>
+        @if (r.emailsFailed > 0) {
+          <p class="mt-1 text-[#8a6d00]">{{ r.emailsFailed }} welcome email(s) could not be sent. Those users can use "Forgot password".</p>
+        }
+      </div>
+    }
+
+    @if (unenrollResult(); as r) {
+      <div class="mt-4 rounded-xl bg-[#f6f6f6] p-4 text-xs" aria-live="polite">
+        <p>
+          <b>{{ r.unenrolled }}</b> unenrolled, <b class="text-red-500">{{ r.failed }}</b> failed (of {{ r.total }} rows).
+        </p>
+      </div>
+    }
+
+    @if (failedRows().length > 0) {
+      <div class="mt-2 rounded-xl bg-[#f6f6f6] p-4 text-xs">
+        <ul class="max-h-32 list-disc overflow-y-auto pl-4">
+          @for (e of failedRows(); track $index) {
+            <li>{{ e.row ? 'Row ' + e.row + ': ' : '' }}{{ e.email }} - {{ e.reason }}</li>
           }
         </ul>
+        <button type="button" (click)="downloadErrors()" class="mt-2 cursor-pointer text-[#4694A4] underline">Download error report</button>
       </div>
     }
 
     <div class="mt-6 flex justify-center gap-3">
       <button type="button" (click)="close()" [disabled]="submitting()"
               class="h-11 w-36 cursor-pointer rounded-xl bg-[#f0f0f0] text-sm text-[#505050] transition hover:bg-[#e6e6e6] disabled:opacity-50">
-        {{ result() ? 'Close' : 'Cancel' }}
+        {{ hasResult() ? 'Close' : 'Cancel' }}
       </button>
-      @if (!result()) {
-        <button type="button" (click)="submit()" [disabled]="courseId() === null || submitting()"
-                class="h-11 w-36 cursor-pointer rounded-xl bg-[#4694A4] text-sm text-white transition hover:bg-[#3b8393] disabled:cursor-not-allowed disabled:opacity-50">
-          {{ submitting() ? 'Please wait…' : isEnroll() ? 'Enroll' : 'Unenroll' }}
-        </button>
-      }
+      <button type="button" (click)="upload()" [disabled]="!file() || submitting()"
+              class="h-11 w-36 cursor-pointer rounded-xl bg-[#4694A4] text-sm text-white transition hover:bg-[#3b8393] disabled:cursor-not-allowed disabled:opacity-50">
+        {{ submitting() ? 'Please wait…' : 'Upload' }}
+      </button>
     </div>
   </section>
 </div>

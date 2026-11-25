@@ -6,14 +6,15 @@ import { FormControl, FormGroup, ReactiveFormsModule } from '@angular/forms';
 import { AuthService, FEATURE } from '../../services/auth';
 import { BulkImportModal } from '../pop-modals/bulk-import-modal/bulk-import-modal';
 import { BulkEnrollModal } from '../pop-modals/bulk-enroll-modal/bulk-enroll-modal';
-import { BulkEnrollResult, ImportResult, ManagedUser, UserManagementService, UserStatus } from '../../services/user-management.service';
+import { BulkDeleteModal } from '../pop-modals/bulk-delete-modal/bulk-delete-modal';
+import { DeleteImportResult, EnrollImportResult, ImportResult, ManagedUser, UnenrollImportResult, UserManagementService, UserStatus } from '../../services/user-management.service';
 
 type RowAction = 'suspend' | 'active' | 'inactive' | 'delete';
 type BulkAction = 'import' | 'export' | 'enroll' | 'unenroll' | 'delete';
 
 @Component({
   selector: 'app-user-management',
-  imports: [ReactiveFormsModule, BulkImportModal, BulkEnrollModal],
+  imports: [ReactiveFormsModule, BulkImportModal, BulkEnrollModal, BulkDeleteModal],
   templateUrl: './user-management.html',
   changeDetection: ChangeDetectionStrategy.OnPush,
   host: {
@@ -31,9 +32,12 @@ export class UserManagement implements OnInit {
   protected readonly selected = signal<ReadonlySet<number>>(new Set());
   protected readonly menuUserId = signal<number | null>(null);
   protected readonly pendingAction = signal<RowAction | null>(null);
+  /** True when the open row menu has to open upwards (not enough room below the clicked row). */
+  protected readonly menuUp = signal(false);
   protected readonly bulkOpen = signal(false);
   protected readonly importOpen = signal(false);
   protected readonly enrollMode = signal<'enroll' | 'unenroll' | null>(null);
+  protected readonly deleteOpen = signal(false);
   protected readonly toast = signal('');
 
   protected readonly dates = new FormGroup({
@@ -52,7 +56,7 @@ export class UserManagement implements OnInit {
     { id: 'export', label: 'Export selected' },
     { id: 'enroll', label: 'Enroll in course' },
     { id: 'unenroll', label: 'Unenroll from course' },
-    { id: 'delete', label: 'Delete selected' },
+    { id: 'delete', label: 'Delete users' },
   ];
 
   protected readonly visibleBulkItems = computed(() =>
@@ -60,7 +64,7 @@ export class UserManagement implements OnInit {
       (i) =>
         (i.id !== 'delete' || this.canDelete()) &&
         (i.id !== 'import' || this.canUpdate()) &&
-        (i.id !== 'enroll' || this.canEnroll()) &&
+        (i.id !== 'enroll' || (this.canEnroll() && this.canUpdate())) &&
         (i.id !== 'unenroll' || this.canUnenroll()),
     ),
   );
@@ -123,7 +127,19 @@ export class UserManagement implements OnInit {
     }
     this.pendingAction.set(null);
     this.dates.reset({ start: user.suspendFrom ?? '', end: user.suspendTo ?? '' });
+    this.menuUp.set(this.shouldOpenUp(event.currentTarget as HTMLElement));
     this.menuUserId.set(user.id);
+  }
+
+  /** Opens the menu upwards when the room below the button (card bottom / screen bottom) is smaller than the menu. */
+  private shouldOpenUp(button: HTMLElement): boolean {
+    const MENU_HEIGHT = 280; // tallest state (suspend dates open)
+    const r = button.getBoundingClientRect();
+    const card = button.closest('.um-scroll')?.getBoundingClientRect();
+    const limit = Math.min(card?.bottom ?? window.innerHeight, window.innerHeight);
+    const below = limit - r.top;
+    const above = r.bottom - Math.max(card?.top ?? 0, 0);
+    return below < MENU_HEIGHT && above > below;
   }
 
   protected toggleBulk(event: Event): void {
@@ -179,27 +195,22 @@ export class UserManagement implements OnInit {
     this.bulkOpen.set(false);
     const ids = [...this.selected()];
     if (action === 'delete') {
-      if (!this.canDelete()) return;
-      if (!ids.length) return this.notify('Select at least one user first');
-      this.api
-        .remove(ids)
-        .pipe(takeUntilDestroyed(this.destroyRef))
-        .subscribe({
-          next: () => {
-            this.selected.set(new Set());
-            this.notify(`${ids.length} user(s) deleted`);
-          },
-          error: (e: HttpErrorResponse) => this.notify(this.errorText(e, 'Unable to delete the users.')),
-        });
+      // Excel upload as well: users are matched by email from the sheet, so no table selection is needed.
+      if (this.canDelete()) this.deleteOpen.set(true);
       return;
     }
     if (action === 'import') {
       if (this.canUpdate()) this.importOpen.set(true);
       return;
     }
-    if (action === 'enroll' || action === 'unenroll') {
-      if (!ids.length) return this.notify('Select at least one user first');
-      this.enrollMode.set(action);
+    if (action === 'enroll') {
+      // Excel upload: users are matched / created from the sheet, so no table selection is needed.
+      if (this.canEnroll() && this.canUpdate()) this.enrollMode.set('enroll');
+      return;
+    }
+    if (action === 'unenroll') {
+      // Excel upload as well: users are matched by email from the sheet, so no table selection is needed.
+      if (this.canUnenroll()) this.enrollMode.set('unenroll');
       return;
     }
     if (action === 'export') {
@@ -218,10 +229,17 @@ export class UserManagement implements OnInit {
     }
   }
 
-  protected onEnrolled(r: BulkEnrollResult): void {
-    const verb = this.enrollMode() === 'unenroll' ? 'unenrolled from' : 'enrolled in';
-    this.notify(`${r.affected} user(s) ${verb} ${r.courseName}`);
-    if (r.skipped.length === 0) this.selected.set(new Set());
+  protected onUnenrolled(r: UnenrollImportResult): void {
+    this.notify(`${r.unenrolled} user(s) unenrolled`);
+  }
+
+  protected onDeleted(r: DeleteImportResult): void {
+    this.selected.set(new Set());
+    this.notify(`${r.deleted} user(s) deleted`);
+  }
+
+  protected onEnrollImported(r: EnrollImportResult): void {
+    this.notify(`${r.enrolled} enrollment(s) saved, ${r.usersCreated} new user(s) created`);
   }
 
   protected onImported(r: ImportResult): void {
