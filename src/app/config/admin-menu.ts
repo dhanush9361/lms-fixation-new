@@ -98,14 +98,6 @@ export const ADMIN_MENU: readonly AdminMenuItem[] = [
     icon: 'certificate',
     access: { type: 'menu', categoryId: MENU.CERTIFICATE },
   },
-  {
-    id: 'subscription',
-    label: 'Subscription',
-    title: 'Subscription & Billing',
-    route: 'subscription',
-    icon: 'subscription',
-    access: { type: 'companyAdmin' },
-  },
 ];
 
 /** Reads the `user` signal through AuthService, so it can be used inside computed(). */

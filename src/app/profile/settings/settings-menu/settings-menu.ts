@@ -1,5 +1,7 @@
-import { ChangeDetectionStrategy, Component, ElementRef, signal, viewChild } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 
+import { AuthService } from '../../../services/auth';
+import { Subscription } from '../../../subscription-billing/subscription/subscription';
 import { TwoFaVerification } from '../two-fa-verification/two-fa-verification';
 
 interface SettingsTab {
@@ -11,28 +13,33 @@ interface SettingsTab {
 
 @Component({
   selector: 'app-settings-menu',
-  imports: [TwoFaVerification],
+  imports: [TwoFaVerification, Subscription],
   templateUrl: './settings-menu.html',
   styleUrl: './settings-menu.css',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class SettingsMenu {
-  readonly tabs: SettingsTab[] = [
+  private readonly auth = inject(AuthService);
+
+  private readonly allTabs: SettingsTab[] = [
     { id: 'general', label: 'General Settings', enabled: true },
     { id: 'subscription', label: 'Subscription & Billing', enabled: true },
     { id: 'invoice', label: 'Invoice Setup', enabled: true },
   ];
 
+  /** Subscription & Billing is for the company admin only (same rule the old sidebar menu used). */
+  readonly tabs = computed(() =>
+    this.allTabs.filter((tab) => tab.id !== 'subscription' || this.auth.isCompanyAdmin()),
+  );
+
   readonly activeTab = signal<string>('general');
 
-  private readonly tabStrip = viewChild<ElementRef<HTMLElement>>('tabStrip');
+  /** Position of the active tab - drives the sliding pill. */
+  readonly activeIndex = computed(() =>
+    Math.max(0, this.tabs().findIndex((tab) => tab.id === this.activeTab())),
+  );
 
   selectTab(tab: SettingsTab): void {
     if (tab.enabled) this.activeTab.set(tab.id);
-  }
-
-  /** The ">" button at the right end of the tab row. */
-  scrollTabs(): void {
-    this.tabStrip()?.nativeElement.scrollBy({ left: 220, behavior: 'smooth' });
   }
 }

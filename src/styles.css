@@ -16,6 +16,75 @@
 }
 
 
+/* ===== Subscription & Billing inside Settings =====*/
+  
+.settings-embed header > button,
+.settings-embed header select,
+.settings-embed header [role='group'] {
+  background-color: #eef6f7;
+  box-shadow: none;
+}
+.settings-embed header > button:hover { background-color: #e1f0f2; }
+
+.settings-embed article {
+  transition: transform 300ms cubic-bezier(0.2, 0.75, 0.25, 1), box-shadow 300ms ease;
+  animation: settings-fade-up 520ms cubic-bezier(0.2, 0.75, 0.25, 1) backwards;
+}
+.settings-embed article:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 24px rgba(78, 179, 196, 0.18);
+}
+.settings-embed article:nth-child(2) { animation-delay: 80ms; }
+.settings-embed article:nth-child(3) { animation-delay: 160ms; }
+.settings-embed article:nth-child(n + 4) { animation-delay: 240ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-embed article { animation: none; transition: none; }
+}
+
+/* Folder-style Settings tab: white shape that slides under the tab labels, with concave curved shoulders */
+.settings-tab-shape {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  border-radius: 16px 16px 0 0;
+  background: #fff;
+  pointer-events: none;
+  transition: transform 450ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+.settings-tab-shape::before,
+.settings-tab-shape::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  transition: opacity 300ms ease;
+}
+.settings-tab-shape::before {
+  left: -16px;
+  background: radial-gradient(circle at 0 0, transparent 16px, #fff 16.5px);
+}
+.settings-tab-shape::after {
+  right: -16px;
+  background: radial-gradient(circle at 100% 0, transparent 16px, #fff 16.5px);
+}
+/* Last tab sits flush with the card's right edge, so no right curve */
+.settings-tab-shape.no-right-curve::after { opacity: 0; }
+
+/* Phones: tabs take the full width, so the side curves would hang outside the card */
+@media (max-width: 640px) {
+  .settings-tab-shape::before,
+  .settings-tab-shape::after { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-tab-shape,
+  .settings-tab-shape::before,
+  .settings-tab-shape::after { transition: none; }
+}
+
 /* ===== 2FA Verification popup ===== */
 @keyframes tfa-fade-in  { from { opacity: 0; } to { opacity: 1; } }
 @keyframes tfa-fade-out { from { opacity: 1; } to { opacity: 0; } }
@@ -352,6 +421,8 @@
     transition-delay: 0s !important;
   }
 }
+
+
 
 /* Shorter rows everywhere on the payment page (method rows, wallet rows, Pay) */
 app-payment-gateway .min-h-12 { min-height: 44px; }

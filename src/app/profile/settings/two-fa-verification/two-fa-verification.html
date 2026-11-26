@@ -1,27 +1,71 @@
-<h2 class="text-[15px] font-medium text-[#444]">2FA Verification Method</h2>
+<div class="flex flex-wrap items-center gap-5 rounded-2xl bg-[#f7fafb] p-6 ring-1 ring-[#e3eef0] sm:flex-nowrap">
 
-<button
-  type="button"
-  (click)="onMainButton()"
-  [attr.aria-pressed]="enabled()"
-  aria-haspopup="dialog"
-  [disabled]="!statusLoaded()"
-  class="mt-3 disabled:cursor-not-allowed disabled:opacity-60 inline-flex h-[26px] min-w-[74px] cursor-pointer items-center justify-center rounded-full px-4 text-[11px] font-medium text-white outline-none transition-all duration-300 hover:-translate-y-px hover:shadow-[0_6px_12px_-4px_rgba(70,148,164,0.6)] focus-visible:ring-2 focus-visible:ring-[#4694A4]/50 active:translate-y-0 active:scale-95 motion-reduce:transition-none"
-  [class]="enabled() ? 'bg-[#4694A4]' : 'bg-[#62b9c8]'"
->
-  {{ enabled() ? 'Turn Off' : 'Turn On' }}
-</button>
+  <!-- Shield icon tile (gets a tick when 2FA is on) -->
+  <div
+    class="grid h-14 w-14 shrink-0 place-items-center rounded-2xl transition-colors duration-500 motion-reduce:transition-none"
+    [class]="enabled() ? 'bg-[#e3f4f7] text-[#4694A4]' : 'bg-white text-[#9aa7aa] ring-1 ring-[#e3eef0]'"
+    aria-hidden="true"
+  >
+    <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3 5 6v5c0 4.5 3 8.2 7 10 4-1.8 7-5.5 7-10V6l-7-3Z" />
+      @if (enabled()) {
+        <path d="m9 12 2.2 2.2L15 10.5" />
+      }
+    </svg>
+  </div>
 
-@if (statusLoaded() && enabled()) {
-  @if (currentMethod() === 'AUTHENTICATOR') {
-    <p class="mt-2 text-[11px] text-[#555]">Google Authenticator is on.</p>
-  } @else {
-    <p class="mt-2 text-[11px] text-[#555]">Email verification is on. Codes are sent to {{ maskedEmail() }}.</p>
-  }
-}
-@if (!dialogOpen() && error()) {
-  <p class="mt-2 text-[11px] text-red-600" role="alert">{{ error() }}</p>
-}
+  <!-- Title, status and details -->
+  <div class="min-w-0 flex-1">
+    <div class="flex flex-wrap items-center gap-2.5">
+      <h2 class="text-[15px] font-medium text-[#444]">2FA Verification Method</h2>
+
+      @if (!statusLoaded()) {
+        <span class="h-5 w-16 animate-pulse rounded-full bg-[#e3eef0] motion-reduce:animate-none" aria-hidden="true"></span>
+      } @else {
+        <span
+          class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-medium"
+          [class]="enabled() ? 'bg-[#e6f6ef] text-[#2f9e6e]' : 'bg-white text-[#8a9a9d] ring-1 ring-[#e3eef0]'"
+        >
+          <span class="relative flex h-1.5 w-1.5">
+            @if (enabled()) {
+              <span class="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#2f9e6e] opacity-60 motion-reduce:animate-none"></span>
+            }
+            <span class="relative inline-flex h-1.5 w-1.5 rounded-full" [class]="enabled() ? 'bg-[#2f9e6e]' : 'bg-[#b5c0c3]'"></span>
+          </span>
+          {{ enabled() ? 'Enabled' : 'Not enabled' }}
+        </span>
+      }
+    </div>
+
+    <p class="mt-1 text-xs leading-5 text-[#777]">
+      Add an extra layer of security by asking for a verification code every time you sign in.
+    </p>
+
+    @if (statusLoaded() && enabled()) {
+      @if (currentMethod() === 'AUTHENTICATOR') {
+        <p class="mt-2 text-[11px] text-[#4694A4]">Google Authenticator is on.</p>
+      } @else {
+        <p class="mt-2 text-[11px] text-[#4694A4]">Email verification is on. Codes are sent to {{ maskedEmail() }}.</p>
+      }
+    }
+    @if (!dialogOpen() && error()) {
+      <p class="mt-2 text-[11px] text-red-600" role="alert">{{ error() }}</p>
+    }
+  </div>
+
+  <!-- Turn On / Turn Off -->
+  <button
+    type="button"
+    (click)="onMainButton()"
+    [attr.aria-pressed]="enabled()"
+    aria-haspopup="dialog"
+    [disabled]="!statusLoaded()"
+    class="inline-flex h-9 min-w-[96px] shrink-0 cursor-pointer items-center justify-center rounded-full px-5 text-xs font-medium text-white outline-none transition-all duration-300 hover:-translate-y-px hover:shadow-[0_6px_12px_-4px_rgba(70,148,164,0.6)] focus-visible:ring-2 focus-visible:ring-[#4694A4]/50 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 motion-reduce:transition-none sm:ml-auto"
+    [class]="enabled() ? 'bg-[#4694A4]' : 'bg-[#62b9c8]'"
+  >
+    {{ enabled() ? 'Turn Off' : 'Turn On' }}
+  </button>
+</div>
 
 @if (dialogOpen()) {
   <!-- ============ Verification popup ============ -->
