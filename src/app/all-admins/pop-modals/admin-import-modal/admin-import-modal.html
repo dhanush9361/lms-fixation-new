@@ -1,0 +1,79 @@
+<div class="fixed inset-0 z-50 grid place-items-center bg-black/25 p-5 backdrop-blur-[4px]" (click)="close()">
+  <section
+    class="relative w-full max-w-[520px] rounded-3xl bg-white p-8 pt-9 shadow-[0_10px_30px_rgba(0,0,0,.25)]"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="admin-import-title"
+    (click)="$event.stopPropagation()"
+  >
+    <button
+      type="button"
+      (click)="close()"
+      [disabled]="uploading()"
+      class="absolute right-0 top-0 grid h-11 w-11 cursor-pointer place-items-center rounded-tr-3xl rounded-bl-2xl bg-[#F7635B] text-white shadow-md transition hover:bg-[#e5544c] disabled:cursor-not-allowed disabled:opacity-50"
+      aria-label="Close"
+    >
+      <svg viewBox="0 0 24 24" class="h-4 w-4" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18" />
+      </svg>
+    </button>
+
+    <h2 id="admin-import-title" class="pr-12 text-xl font-semibold text-[#505050]">Import Admins</h2>
+    <p class="mt-1 text-xs text-[#6b6b6b]">Choose the file you like to upload</p>
+
+    <div class="mt-5 flex items-center justify-between gap-3 rounded-xl bg-[#f6f6f6] px-4 py-3">
+      <label for="admin-file" class="shrink-0 text-xs text-[#505050]">Upload file<span class="text-red-500">*</span></label>
+      <span class="min-w-0 flex-1 truncate text-right text-xs text-[#8a8a8a]">{{ file()?.name ?? '' }}</span>
+      @if (file()) {
+        <button type="button" (click)="clear()" [disabled]="uploading()" aria-label="Remove file"
+                class="cursor-pointer text-xs text-[#F7635B]">✕</button>
+      }
+      <input id="admin-file" #fi type="file" class="sr-only" (change)="pick($event)"
+             accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" />
+      <button type="button" (click)="fi.click()" [disabled]="uploading()"
+              class="shrink-0 cursor-pointer rounded-lg bg-white px-4 py-2 text-[11px] shadow-sm transition hover:shadow-md focus-visible:outline-2 focus-visible:outline-[#4694A4] disabled:opacity-50">
+        Choose a file
+      </button>
+    </div>
+
+    @if (error()) {
+      <p class="mt-3 text-xs text-red-500" role="alert" aria-live="polite">{{ error() }}</p>
+    }
+
+    <p class="mt-4 text-xs text-[#505050]">
+      Here you can
+      <a href="#" (click)="downloadTemplate($event)" class="text-[#4694A4] underline">Download Sample Excel Template</a>
+    </p>
+
+    @if (result(); as r) {
+      <div class="mt-4 rounded-xl bg-[#f6f6f6] p-4 text-xs" aria-live="polite">
+        <p><b>{{ r.imported }}</b> of {{ r.total }} admins imported, <b class="text-red-500">{{ r.failed }}</b> failed.</p>
+        @if (r.emailsFailed > 0) {
+          <p class="mt-1 text-[#8a6d00]">{{ r.emailsFailed }} welcome email(s) could not be sent. Those admins can use "Forgot password".</p>
+        }
+        @if (r.withoutPackage > 0) {
+          <p class="mt-1 text-[#8a6d00]">{{ r.withoutPackage }} admin(s) have no package yet. Assign one in Package, otherwise they cannot log in.</p>
+        }
+        @if (r.failed > 0) {
+          <ul class="mt-2 max-h-28 list-disc overflow-y-auto pl-4">
+            @for (e of r.errors; track $index) {
+              <li>{{ e.row ? 'Row ' + e.row + ': ' : '' }}{{ e.email }} - {{ e.reason }}</li>
+            }
+          </ul>
+          <button type="button" (click)="downloadErrors()" class="mt-2 cursor-pointer text-[#4694A4] underline">Download error report</button>
+        }
+      </div>
+    }
+
+    <div class="mt-6 flex justify-center gap-3">
+      <button type="button" (click)="close()" [disabled]="uploading()"
+              class="h-11 w-36 cursor-pointer rounded-xl bg-[#f0f0f0] text-sm text-[#505050] transition hover:bg-[#e6e6e6] disabled:opacity-50">
+        {{ result() ? 'Close' : 'Cancel' }}
+      </button>
+      <button type="button" (click)="upload()" [disabled]="!file() || uploading()"
+              class="h-11 w-36 cursor-pointer rounded-xl bg-[#4694A4] text-sm text-white transition hover:bg-[#3b8393] disabled:cursor-not-allowed disabled:opacity-50">
+        {{ uploading() ? 'Importing…' : 'Import' }}
+      </button>
+    </div>
+  </section>
+</div>

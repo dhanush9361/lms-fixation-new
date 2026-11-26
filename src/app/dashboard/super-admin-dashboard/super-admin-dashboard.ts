@@ -56,6 +56,14 @@ export class SuperAdminDashboard {
     const path = this.currentUrl().split('#')[0].split('?')[0];
     const packageList = ['/super-admin-dashboard', 'package'];
 
+    // /super-admin-dashboard/admins/:id/edit-profile
+    if (/^\/super-admin-dashboard\/admins\/[^/]+\/edit-profile\/?$/.test(path)) {
+      return [
+        { label: 'Admins', link: ['/super-admin-dashboard', 'admins'] },
+        { label: 'Edit Profile', link: null },
+      ];
+    }
+
     // /super-admin-dashboard/package
     if (/^\/super-admin-dashboard\/package\/?$/.test(path)) {
       return [

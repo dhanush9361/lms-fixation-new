@@ -187,7 +187,7 @@
     </aside>
 
     <!-- Icon nav, placed on top of the curve -->
-    <!-- Super Admin only manages Packages, so this is the ONLY item here -->
+    <!-- Super Admin menu: Dashboard, Admins, Package -->
     <nav
       class="fixed left-0 top-16 z-10 hidden h-[calc(100vh-4rem)] w-[clamp(48px,4.5vw,84px)] flex-col items-center justify-center gap-8 sm:flex"
     >
@@ -207,6 +207,21 @@
         <span class="text-[10px] leading-tight">Dashboard</span>
       </a>
 
+      <!-- Admins -->
+      <a
+        routerLink="admins"
+        routerLinkActive="text-white"
+        class="group flex flex-col items-center gap-1 text-white/90 transition hover:text-white"
+        title="Admins"
+      >
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+          <circle cx="9" cy="7" r="4"></circle>
+          <path d="M22 21v-2a4 4 0 0 0-3-3.87"></path>
+          <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+        </svg>
+        <span class="text-[10px] leading-tight">Admins</span>
+      </a>
 
       <!-- Package Management -->
       <a

@@ -105,6 +105,21 @@ export const routes: Routes = [
 
 
       { path: '', redirectTo: 'package', pathMatch: 'full' },
+      // Admins: company admin list + status control (More Action)
+      {
+        path: 'admins',
+        loadComponent: () =>
+          import('./all-admins/admin-list/admin-list').then((m) => m.AdminList),
+        title: 'Admins',
+      },
+      // Admins -> More Action -> Edit Profile: the same EditProfile screen, loaded for :userId
+      {
+        path: 'admins/:userId/edit-profile',
+        data: { profileScope: 'super-admin' },
+        loadComponent: () =>
+          import('./profile/edit-profile/edit-profile').then((m) => m.EditProfile),
+        title: 'Edit Profile',
+      },
       {
         path: 'package',
         loadComponent: () =>

@@ -23,7 +23,7 @@ import {
 import { finalize } from 'rxjs';
 import { AuthService } from '../../services/auth';
 import { TokenStorageService } from '../../services/token-storage.service';
-import { ProfileData, ProfileService, ProfileUpdate } from '../../services/profile.service';
+import { ProfileData, ProfileService, ProfileTarget, ProfileUpdate } from '../../services/profile.service';
 
 /* -------------------------------------------------------------------------- */
 /*  Constants (same rules as signup - keep in sync with ProfileDto.java)      */
@@ -217,6 +217,15 @@ export class EditProfile implements OnInit {
     return Number.isInteger(id) && id > 0 ? id : null;
   })();
 
+  /** True when the super admin opened this screen from Admins (route admins/:userId/edit-profile). */
+  private readonly fromSuperAdmin = this.route.snapshot.data['profileScope'] === 'super-admin';
+
+  /** Whose profile the API calls read / write. */
+  private readonly profileTarget: ProfileTarget =
+    this.fromSuperAdmin && this.managedUserId !== null
+      ? { adminId: this.managedUserId }
+      : this.managedUserId;
+
   /** Role of the profile on screen (the clicked user's role when managing, otherwise your own). */
   private readonly profileRole = signal('');
   private readonly displayedRole = computed(
@@ -364,7 +373,7 @@ export class EditProfile implements OnInit {
   private loadProfile(): void {
     this.loading.set(true);
     this.profileService
-      .getMyProfile(this.managedUserId)
+      .getMyProfile(this.profileTarget)
       .pipe(
         finalize(() => this.loading.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -494,7 +503,7 @@ export class EditProfile implements OnInit {
 
     this.saving.set(true);
     this.profileService
-      .updateMyProfile(payload, this.managedUserId)
+      .updateMyProfile(payload, this.profileTarget)
       .pipe(
         finalize(() => this.saving.set(false)),
         takeUntilDestroyed(this.destroyRef),
@@ -518,7 +527,9 @@ export class EditProfile implements OnInit {
   this.pictureError.set('');
   this.openDropdown.set(null);
   void this.router.navigate(
-    this.managedUserId === null
+    this.fromSuperAdmin
+      ? ['/super-admin-dashboard', 'admins']
+      : this.managedUserId === null
       ? ['/admin-dashboard', 'admin-dashboard-home']
       : ['/admin-dashboard', 'users'],
   );
@@ -586,13 +597,13 @@ export class EditProfile implements OnInit {
   /* ------------------------------------------------------------------------ */
 
   protected onProfilePictureSelected(event: Event): void {
-    this.handlePicture(event, (file) => this.profileService.uploadProfilePicture(file, this.managedUserId), (p) =>
+    this.handlePicture(event, (file) => this.profileService.uploadProfilePicture(file, this.profileTarget), (p) =>
       this.profilePicturePreview.set(p.profilePictureUrl),
     );
   }
 
   protected onBackgroundPictureSelected(event: Event): void {
-    this.handlePicture(event, (file) => this.profileService.uploadBackgroundPicture(file, this.managedUserId), (p) =>
+    this.handlePicture(event, (file) => this.profileService.uploadBackgroundPicture(file, this.profileTarget), (p) =>
       this.backgroundPicturePreview.set(p.backgroundPictureUrl),
     );
   }

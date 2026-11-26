@@ -32,6 +32,14 @@ export interface ProfileData {
   backgroundPictureUrl: string | null;
 }
 
+/** Super Admin editing a company admin (/api/super-admin/admins/{adminId}/profile). */
+export interface SuperAdminProfileTarget {
+  adminId: number;
+}
+
+/** null / undefined = yourself, number = a user of your company, object = an admin (super admin only). */
+export type ProfileTarget = number | SuperAdminProfileTarget | null | undefined;
+
 /** Body of PUT /api/profile/me. */
 export interface ProfileUpdate {
   firstName: string;
@@ -57,48 +65,52 @@ export class ProfileService {
   private readonly apiUrl = `${environment.apiBaseUrl}/api/profile`;
 
   /**
-   * Every method takes an optional `userId`. Without it the call targets the logged-in user
-   * (/api/profile/me). With it (admin opening a row's "Edit Profile" in All Users) it targets
+   * Every method takes an optional target. Without it the call targets the logged-in user
+   * (/api/profile/me). A user id (admin opening a row's "Edit Profile" in All Users) targets
    * /api/users/{id}/profile, which the backend limits to users of the admin's own company.
+   * { adminId } (Super Admin > Admins) targets /api/super-admin/admins/{id}/profile.
    */
-  private base(userId?: number | null): string {
-    return userId == null ? `${this.apiUrl}/me` : `${environment.apiBaseUrl}/api/users/${userId}/profile`;
+  private base(target?: ProfileTarget): string {
+    if (target == null) return `${this.apiUrl}/me`;
+    return typeof target === 'number'
+      ? `${environment.apiBaseUrl}/api/users/${target}/profile`
+      : `${environment.apiBaseUrl}/api/super-admin/admins/${target.adminId}/profile`;
   }
 
-  private pictureBase(userId?: number | null): string {
-    return userId == null ? `${this.apiUrl}/me/picture` : `${this.base(userId)}/picture`;
+  private pictureBase(target?: ProfileTarget): string {
+    return `${this.base(target)}/picture`;
   }
 
-  private backgroundBase(userId?: number | null): string {
-    return userId == null ? `${this.apiUrl}/me/background-picture` : `${this.base(userId)}/background-picture`;
+  private backgroundBase(target?: ProfileTarget): string {
+    return `${this.base(target)}/background-picture`;
   }
 
-  getMyProfile(userId?: number | null): Observable<ProfileData> {
-    return this.http.get<ApiResponse<ProfileData>>(this.base(userId)).pipe(this.unwrap());
+  getMyProfile(target?: ProfileTarget): Observable<ProfileData> {
+    return this.http.get<ApiResponse<ProfileData>>(this.base(target)).pipe(this.unwrap());
   }
 
-  updateMyProfile(payload: ProfileUpdate, userId?: number | null): Observable<ProfileData> {
-    return this.http.put<ApiResponse<ProfileData>>(this.base(userId), payload).pipe(this.unwrap());
+  updateMyProfile(payload: ProfileUpdate, target?: ProfileTarget): Observable<ProfileData> {
+    return this.http.put<ApiResponse<ProfileData>>(this.base(target), payload).pipe(this.unwrap());
   }
 
-  uploadProfilePicture(file: File, userId?: number | null): Observable<ProfileData> {
+  uploadProfilePicture(file: File, target?: ProfileTarget): Observable<ProfileData> {
     return this.http
-      .post<ApiResponse<ProfileData>>(this.pictureBase(userId), this.toFormData(file))
+      .post<ApiResponse<ProfileData>>(this.pictureBase(target), this.toFormData(file))
       .pipe(this.unwrap());
   }
 
-  uploadBackgroundPicture(file: File, userId?: number | null): Observable<ProfileData> {
+  uploadBackgroundPicture(file: File, target?: ProfileTarget): Observable<ProfileData> {
     return this.http
-      .post<ApiResponse<ProfileData>>(this.backgroundBase(userId), this.toFormData(file))
+      .post<ApiResponse<ProfileData>>(this.backgroundBase(target), this.toFormData(file))
       .pipe(this.unwrap());
   }
 
-  removeProfilePicture(userId?: number | null): Observable<ProfileData> {
-    return this.http.delete<ApiResponse<ProfileData>>(this.pictureBase(userId)).pipe(this.unwrap());
+  removeProfilePicture(target?: ProfileTarget): Observable<ProfileData> {
+    return this.http.delete<ApiResponse<ProfileData>>(this.pictureBase(target)).pipe(this.unwrap());
   }
 
-  removeBackgroundPicture(userId?: number | null): Observable<ProfileData> {
-    return this.http.delete<ApiResponse<ProfileData>>(this.backgroundBase(userId)).pipe(this.unwrap());
+  removeBackgroundPicture(target?: ProfileTarget): Observable<ProfileData> {
+    return this.http.delete<ApiResponse<ProfileData>>(this.backgroundBase(target)).pipe(this.unwrap());
   }
 
   /** Backend stores relative paths (/uploads/profile/x.jpg); make them absolute for <img [src]>. */

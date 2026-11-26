@@ -1,0 +1,160 @@
+<div class="relative w-full font-dmsans text-[#505050]">
+  <main class="px-5 pb-8 pt-4 md:px-7">
+
+    <header class="mb-5 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <h1 class="text-xl font-semibold 2xl:text-[25px]">Admin’s List</h1>
+        <p class="mt-1 text-sm">Manage admin profiles, personal details, and account preferences with ease.</p>
+      </div>
+
+      <!-- The dropdown overlays the table, so the page does not jump when it opens. -->
+      <div class="relative h-9 w-[130px]">
+        <div class="absolute right-0 top-0 z-40 w-full overflow-hidden rounded-2xl bg-white text-center shadow-md" (click)="$event.stopPropagation()">
+          <button type="button" (click)="toggleBulk($event)" aria-haspopup="true" [attr.aria-expanded]="bulkOpen()"
+                  class="flex h-9 w-full cursor-pointer items-center justify-center gap-2 text-xs focus-visible:outline-2 focus-visible:outline-[#4694A4]">
+            Bulk Admin’s
+            <svg viewBox="0 0 24 24" class="h-3 w-3 transition-transform" [class.rotate-180]="bulkOpen()" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+              <path d="M6 9l6 6 6-6" />
+            </svg>
+          </button>
+          @if (bulkOpen()) {
+            <button type="button" (click)="openImport()"
+                    class="block w-full cursor-pointer border-t border-[#eee] py-2 text-[11px] transition hover:bg-[#f4f4f4]">Import</button>
+            <button type="button" (click)="exportCsv()" [disabled]="exporting()"
+                    class="block w-full cursor-pointer border-t border-[#eee] py-2 text-[11px] transition hover:bg-[#f4f4f4] disabled:opacity-50">
+              Export as CSV{{ selected().size ? ' (' + selected().size + ')' : '' }}
+            </button>
+          }
+        </div>
+      </div>
+    </header>
+
+    <section class="flex min-h-[calc(100vh-190px)] flex-col rounded-[20px] bg-white pb-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)]" aria-label="Admins table">
+      <div class="al-scroll flex-1 overflow-x-auto">
+        <table class="w-full min-w-[760px] border-separate border-spacing-0 text-left text-xs">
+          <thead>
+            <tr class="[&>th]:border-b [&>th]:border-[#f0f0f0] [&>th]:py-6 [&>th]:text-[13px] [&>th]:font-medium">
+              <th class="w-[5%] pl-7">
+                <input type="checkbox" class="al-check" aria-label="Select all admins"
+                       [checked]="allSelected()" [indeterminate]="someSelected()" (change)="toggleAll()" />
+              </th>
+              <th class="w-[18%]">Username</th>
+              <th class="w-[23%]">Email</th>
+              <th class="w-[18%]">Organization</th>
+              <th class="w-[26%]">Status</th>
+              <th class="w-[10%] pr-8 text-right">More Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (a of admins(); track a.id) {
+              <tr class="transition-colors hover:bg-[#fafafa] [&>td]:py-3" [class.bg-[#f4fafb]]="selected().has(a.id)">
+                <td class="pl-7">
+                  <input type="checkbox" class="al-check" [attr.aria-label]="'Select ' + a.username"
+                         [checked]="selected().has(a.id)" (change)="toggleOne(a.id)" />
+                </td>
+                <td>
+                  <div class="flex items-center gap-2">
+                    @if (a.profilePictureUrl) {
+                      <img [src]="a.profilePictureUrl" alt="" width="22" height="22" class="h-[22px] w-[22px] shrink-0 rounded-full object-cover" />
+                    } @else {
+                      <span class="grid h-[22px] w-[22px] shrink-0 place-items-center rounded-full bg-[#2b3a42] text-[9px] font-semibold text-white" aria-hidden="true">{{ a.username.slice(0, 1) }}</span>
+                    }
+                    <span class="truncate">{{ a.username }}</span>
+                  </div>
+                </td>
+                <td class="truncate">{{ a.email }}</td>
+                <td class="truncate">{{ a.organization || '-' }}</td>
+                <td>
+                  <span class="inline-flex items-center gap-1.5">
+                    <span class="h-1.5 w-1.5 rounded-full" aria-hidden="true"
+                          [class]="a.status === 'Active' ? 'bg-[#61b7c5]' : a.status === 'Suspended' ? 'bg-amber-400' : 'bg-[#c4c4c4]'"></span>
+                    {{ a.status }}
+                  </span>
+                </td>
+                <td class="pr-8">
+                  <div class="relative flex justify-end">
+                    <button type="button" (click)="toggleMenu($event, a)"
+                            class="grid h-6 w-6 cursor-pointer place-items-center rounded-full bg-[#f1f1f1] transition hover:bg-[#61b7c5] hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#4694A4]"
+                            [attr.aria-label]="'Actions for ' + a.username" aria-haspopup="dialog" [attr.aria-expanded]="menuAdminId() === a.id">
+                      <svg viewBox="0 0 24 24" fill="currentColor" class="h-3 w-3" aria-hidden="true">
+                        <circle cx="12" cy="5" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="12" cy="19" r="1.8" />
+                      </svg>
+                    </button>
+
+                    @if (menuAdminId() === a.id) {
+                      <div role="dialog" [attr.aria-label]="'Actions for ' + a.username" (click)="$event.stopPropagation()"
+                           class="al-pop absolute right-9 z-30 w-[190px] overflow-hidden rounded-[18px] bg-[#f6f6f6] text-left text-[11px] shadow-xl ring-1 ring-black/5"
+                           [class.top-[-14px]]="!menuUp()" [class.bottom-[-14px]]="menuUp()">
+                        <button type="button" (click)="editProfile(a)"
+                                class="block w-full cursor-pointer py-3 pl-9 pr-3 text-left transition hover:bg-[#ececec]">Edit Profile</button>
+
+                        <div class="border-t border-[#e6e6e6] px-3 py-2.5">
+                          <label class="flex cursor-pointer items-center gap-2">
+                            <input type="checkbox" class="al-check al-check-sm" [checked]="pendingAction() === 'suspend'" (change)="pick('suspend')" />
+                            Suspend Admin
+                          </label>
+                          @if (pendingAction() === 'suspend') {
+                            <div class="mt-2 grid grid-cols-1 gap-1.5" [formGroup]="dates">
+                              <label class="flex items-center justify-between gap-1 whitespace-nowrap">
+                                Start Date
+                                <input type="date" formControlName="start" class="w-[108px] rounded-full bg-white px-2 py-1 text-[10px] outline-none focus:ring-1 focus:ring-[#61b7c5]" />
+                              </label>
+                              <label class="flex items-center justify-between gap-1 whitespace-nowrap">
+                                End Date
+                                <input type="date" formControlName="end" class="w-[108px] rounded-full bg-white px-2 py-1 text-[10px] outline-none focus:ring-1 focus:ring-[#61b7c5]" />
+                              </label>
+                            </div>
+                          }
+                        </div>
+
+                        @for (item of statusActions; track item.id) {
+                          <label class="flex cursor-pointer items-center gap-2 border-t border-[#e6e6e6] px-3 py-2.5 transition hover:bg-[#ececec]">
+                            <input type="checkbox" class="al-check al-check-sm" [checked]="pendingAction() === item.id" (change)="pick(item.id)" />
+                            {{ item.label }}
+                          </label>
+                        }
+
+                        @if (pendingAction() === 'delete') {
+                          <p class="px-3 pb-2 text-[10px] text-[#b3261e]" role="alert">Saving deletes this admin. This cannot be undone.</p>
+                        }
+
+                        <div class="flex gap-2 border-t border-[#e6e6e6] px-3 py-3">
+                          <button type="button" (click)="closeMenu()"
+                                  class="h-6 flex-1 cursor-pointer rounded-full bg-white transition hover:bg-[#e9e9e9]">Cancel</button>
+                          <button type="button" (click)="save(a)" [disabled]="!pendingAction() || saving()"
+                                  class="h-6 flex-1 cursor-pointer rounded-full bg-white transition enabled:hover:bg-[#61b7c5] enabled:hover:text-white disabled:cursor-not-allowed disabled:opacity-50">Save</button>
+                        </div>
+                      </div>
+                    }
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="px-7 py-16 text-center text-[#6f6f6f]">{{ loading() ? 'Loading admins…' : 'No admins found.' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      @if (admins().length < total()) {
+        <button type="button" (click)="loadMore()" [disabled]="loading()"
+                class="mx-auto mt-3 cursor-pointer rounded-full bg-[#f1f1f1] px-5 py-2 text-xs transition hover:bg-[#e9e9e9] disabled:opacity-50">
+          Load more ({{ admins().length }} of {{ total() }})
+        </button>
+      }
+    </section>
+
+    @if (importOpen()) {
+      <app-admin-import-modal (closed)="importOpen.set(false)" (imported)="onImported($event)" />
+    }
+
+    <!-- Always in the DOM so screen readers announce new messages. -->
+    <div role="status" aria-live="polite">
+      @if (toast()) {
+        <div class="al-pop fixed right-8 top-24 z-50 rounded-xl bg-[#2f6f7c] px-5 py-3 text-sm text-white shadow-lg">{{ toast() }}</div>
+      }
+    </div>
+  </main>
+</div>

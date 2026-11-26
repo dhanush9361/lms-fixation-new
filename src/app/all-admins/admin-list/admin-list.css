@@ -1,0 +1,26 @@
+/* Soft grey square checkbox, as in the design. */
+.al-check {
+  appearance: none;
+  display: inline-grid;
+  place-content: center;
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  background: #e2e2e2;
+  cursor: pointer;
+}
+.al-check-sm { background: #fff; box-shadow: inset 0 0 0 1px #dcdcdc; }
+.al-check:checked,
+.al-check:indeterminate { background: #3e8d99; box-shadow: none; }
+.al-check:checked::after { content: '✓'; color: #fff; font-size: 9px; line-height: 1; }
+.al-check:indeterminate::after { content: '–'; color: #fff; font-size: 10px; line-height: 1; }
+.al-check:focus-visible { outline: 2px solid #4694a4; outline-offset: 2px; }
+
+.al-pop { animation: al-pop-in 160ms ease-out both; }
+@keyframes al-pop-in {
+  from { opacity: 0; transform: translateY(-4px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .al-pop { animation: none; }
+}
