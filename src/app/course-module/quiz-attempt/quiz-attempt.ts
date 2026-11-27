@@ -211,6 +211,28 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   protected readonly unansweredInSection = computed(
     () => this.currentSection()?.questions.filter((q) => !this.hasAnswer(q.id)).length ?? 0,
   );
+  /** Unanswered questions the learner can still answer (submitted sections are locked, so they are not counted). */
+  private readonly unansweredOpen = computed(() =>
+    this.sections()
+      .filter((s) => !s.submitted)
+      .reduce((n, s) => n + s.questions.filter((q) => !this.hasAnswer(q.id)).length, 0),
+  );
+  /** Finish stays unavailable until every question is answered. */
+  protected readonly finishDisabled = computed(() => this.busy() || this.unansweredOpen() > 0);
+  /** Submit Section also needs all answers, because a submitted section can't be answered later. */
+  protected readonly submitSectionDisabled = computed(
+    () => this.locked() || this.busy() || this.unansweredInSection() > 0,
+  );
+  /**
+   * Next is disabled for an unanswered choice question. For a text question it stays clickable,
+   * so that next() can show "Answer is required." without moving ahead.
+   */
+  protected readonly nextDisabled = computed(() => {
+    const q = this.currentQuestion();
+    if (this.isLast()) return true;
+    if (this.locked() || !q || q.type === 'SHORT_TEXT') return false;
+    return !this.hasAnswer(q.id);
+  });
 
   ngOnInit(): void {
     const params = this.route.snapshot.paramMap;
@@ -364,9 +386,12 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     const frame = document.createElement('iframe');
     frame.title = 'Quiz print view';
     frame.setAttribute('aria-hidden', 'true');
+    // off screen but with a real page size: a 0x0 frame can cut long print output in some browsers
     frame.style.position = 'fixed';
-    frame.style.width = '0';
-    frame.style.height = '0';
+    frame.style.left = '-10000px';
+    frame.style.top = '0';
+    frame.style.width = '794px';
+    frame.style.height = '1123px';
     frame.style.border = '0';
     this.printFrame = frame;
     document.body.appendChild(frame);
@@ -379,7 +404,7 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     if (attempt.status === 'SUBMITTED') {
       this.api.review(this.courseId, this.courseSectionId, this.bankId).pipe(
         catchError(() => of(null)),
-      ).subscribe((review) => this.writePrintDocument(frame, printWindow, attempt, review?.questions ?? null));
+      ).subscribe((review) => this.writePrintDocument(frame, printWindow, attempt, review));
       return;
     }
     this.writePrintDocument(frame, printWindow, attempt, null);
@@ -388,9 +413,10 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     frame: HTMLIFrameElement,
     printWindow: Window,
     attempt: QuizAttempt,
-    reviewQuestions: QuizReview['questions'] | null,
+    quizReview: QuizReview | null,
   ): void {
-    const reviewById = new Map((reviewQuestions ?? []).map((question) => [question.id, question]));
+    const reviewById = new Map((quizReview?.questions ?? []).map((question) => [question.id, question]));
+    const summary = this.printSummary(attempt, quizReview);
     let number = 0;
     const sections = attempt.sections.map((section) => {
     const questions = section.questions.map((question) => { number += 1;
@@ -417,11 +443,10 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     }).join('');
     printWindow.document.open();
     printWindow.document.write(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${this.escapeHtml(attempt.bankName)} - Quiz answers</title><style>
+      html,body{height:auto;overflow:visible}h1,h2,.meta{break-after:avoid}h2,li,p{overflow-wrap:anywhere}.summary{break-inside:avoid;border:1px solid #ddd;padding:8px 14px}.summary p{margin:4px 0}
       body{font:14px/1.5 Arial,sans-serif;color:#222;max-width:850px;margin:32px auto;padding:0 24px}h1{font-size:20px;border-bottom:1px solid #bbb;padding-bottom:8px}h2{font-size:16px;font-weight:600;margin:8px 0}article{break-inside:avoid;border-bottom:1px solid #ddd;padding:14px 0}.meta{font-size:12px;color:#666;margin:0}.label{font-size:12px;color:#28636c}li{margin:6px 0}.feedback{background:#f3f7f8;padding:8px}@media print{body{margin:0 auto;padding:0 12mm}section{break-after:auto}}
-      </style></head><body><header><h1>${this.escapeHtml(attempt.bankName)}</h1><p>${this.escapeHtml(attempt.courseName)}</p></header>${sections}</body></html>`);
+      </style></head><body><header><h1>${this.escapeHtml(attempt.bankName)}</h1><p>${this.escapeHtml(attempt.courseName)}</p></header>${summary}${sections}</body></html>`);
     printWindow.document.close();
-    printWindow.focus();
-    // Wait until browser renders the print content
     printWindow.addEventListener('afterprint', () => {
      frame.remove();
       if (this.printFrame === frame) {
@@ -429,7 +454,28 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
         }
       }, { once: true });
     printWindow.focus();
-    printWindow.print();   
+    // wait until the browser has laid out the whole document (large quizzes) before printing
+    setTimeout(() => {
+      if (this.printFrame === frame) printWindow.print();
+    }, 300);
+  }
+  /** Quiz Summary block at the top of the printout (finished quiz only). */
+  private printSummary(attempt: QuizAttempt, quizReview: QuizReview | null): string {
+    if (attempt.status !== 'SUBMITTED') return '';
+    const rows: [string, string][] = [];
+    if (attempt.maxScore) rows.push(['Score', `${attempt.score ?? 0}/${attempt.maxScore}`]);
+    if (quizReview) {
+      rows.push(['Correct answers', String(quizReview.correctCount)]);
+      rows.push(['Incorrect answers', String(quizReview.incorrectCount)]);
+    }
+    if (attempt.submittedAt) {
+      rows.push(['Date submitted', new Date(attempt.submittedAt).toLocaleDateString('en-GB')]);
+    }
+    rows.push(['Attempts', `${this.pad(attempt.attemptNumber)}/${this.pad(attempt.maxAttempts)}`]);
+    rows.push(['Time taken', `${this.timerText()} Hrs`]);
+    return `<div class="summary">${rows
+      .map(([label, value]) => `<p><strong>${this.escapeHtml(label)}:</strong> ${this.escapeHtml(value)}</p>`)
+      .join('')}</div>`;
   }
   private escapeHtml(value: string | null | undefined): string {
     return (value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -497,7 +543,11 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   protected onTextInput(question: QuizQuestion, event: Event): void {
     if (this.locked()) return;
     const value = (event.target as HTMLTextAreaElement).value;
-    this.textAnswerError.set(value.length >= 500 ? 'Maximum Length 500 Characters.' : null);
+    if (!value.trim()) {
+      this.textAnswerError.set('Answer is required.'); // empty or only spaces = not answered
+    } else {
+      this.textAnswerError.set(value.length >= 500 ? 'Maximum Length 500 Characters.' : null);
+    }
     this.setAnswer(question.id, { optionIds: [], text: value }, SAVE_DELAY_TEXT_MS);
   }
 
@@ -535,7 +585,8 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     return this.api
       .saveAnswer(this.courseId, this.courseSectionId, this.bankId, questionId, {
         optionIds: answer.optionIds,
-        text: answer.text ?? '',
+        // only spaces is saved as blank, so the server also treats it as not answered
+        text: answer.text?.trim() ? answer.text : '',
       })
       .pipe(
         map(() => {
@@ -632,8 +683,9 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
     const section = this.currentSection();
     if (!section || this.isLast()) return;
     const question = this.currentQuestion();
-    if (question?.type === 'SHORT_TEXT' && !this.hasAnswer(question.id)) {
-      this.textAnswerError.set('Answer is required.');
+    // an open question must be answered first; locked (submitted) questions can always be passed
+    if (question && !this.locked() && !this.hasAnswer(question.id)) {
+      if (question.type === 'SHORT_TEXT') this.textAnswerError.set('Answer is required.');
       return;
     }
     this.textAnswerError.set(null);
@@ -664,12 +716,12 @@ export class QuizAttemptPage implements OnInit, OnDestroy {
   // ------------------------------------------------------------------
 
   protected askSubmitSection(): void {
-    if (this.locked() || this.busy()) return;
+    if (this.submitSectionDisabled()) return;
     this.confirm.set('section');
   }
 
   protected askFinish(): void {
-    if (this.finished() || this.busy()) return;
+    if (this.finished() || this.finishDisabled()) return;
     this.confirm.set('finish');
   }
 

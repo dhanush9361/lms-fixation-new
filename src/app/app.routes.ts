@@ -7,6 +7,7 @@ import {
   learnerHomeGuard,
   menuGuard,
   roleGuard,
+  unsavedChangesGuard,
 } from './guards/role.guard';
 import { COURSE_ACCESS } from './config/admin-menu';
 import { FEATURE, MENU } from './services/auth';
@@ -190,6 +191,7 @@ export const routes: Routes = [
       {
         path: 'users',
         canActivate: [menuGuard(MENU.USERS)],
+        canDeactivate: [unsavedChangesGuard],
         loadComponent: () =>
           import('./all-users/user-management/user-management').then((m) => m.UserManagement),
         title: 'All Users',

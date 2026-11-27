@@ -20,6 +20,7 @@ type BulkAction = 'import' | 'export' | 'enroll' | 'unenroll' | 'delete';
   host: {
     '(document:click)': 'closeAll()',
     '(document:keydown.escape)': 'closeAll()',
+    '(window:beforeunload)': 'onBeforeUnload($event)',
   },
 })
 export class UserManagement implements OnInit {
@@ -89,10 +90,22 @@ export class UserManagement implements OnInit {
   private toastTimer: ReturnType<typeof setTimeout> | undefined;
 
   ngOnInit(): void {
+    // Suspend User is unchecked by default, so the dates start disabled.
+    this.dates.disable({ emitEvent: false });
+
     this.api
       .load()
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({ error: (e: HttpErrorResponse) => this.notify(this.errorText(e, 'Unable to load users.')) });
+  }
+
+  /** Used by unsavedChangesGuard (guards/role.guard.ts) and the browser refresh/close warning. */
+  hasUnsavedChanges(): boolean {
+    return this.pendingAction() !== null;
+  }
+
+  protected onBeforeUnload(event: BeforeUnloadEvent): void {
+    if (this.hasUnsavedChanges()) event.preventDefault();
   }
 
   /** "Edit Profile" in the row menu -> the existing edit-profile screen, filled with this user's details. */
@@ -101,9 +114,26 @@ export class UserManagement implements OnInit {
     void this.router.navigate(['/admin-dashboard', 'users', user.id, 'edit-profile']);
   }
 
+  /** Only hides the menus. Does NOT clear pendingAction (the navigation guard needs it). */
   protected closeAll(): void {
     this.menuUserId.set(null);
     this.bulkOpen.set(false);
+  }
+
+  /** Cancel button: close the popup and throw away the unsaved choice and dates. */
+  protected cancel(): void {
+    this.discard();
+  }
+
+  private discard(): void {
+    this.pendingAction.set(null);
+    this.resetDates();
+    this.closeAll();
+  }
+
+  private resetDates(): void {
+    this.dates.reset({ start: '', end: '' });
+    this.dates.disable({ emitEvent: false });
   }
 
   protected toggleAll(): void {
@@ -125,8 +155,9 @@ export class UserManagement implements OnInit {
       this.menuUserId.set(null);
       return;
     }
+    // Every time the popup opens it starts clean: nothing checked, dates empty and disabled.
     this.pendingAction.set(null);
-    this.dates.reset({ start: user.suspendFrom ?? '', end: user.suspendTo ?? '' });
+    this.resetDates();
     this.menuUp.set(this.shouldOpenUp(event.currentTarget as HTMLElement));
     this.menuUserId.set(user.id);
   }
@@ -149,7 +180,15 @@ export class UserManagement implements OnInit {
   }
 
   protected pick(action: RowAction): void {
-    this.pendingAction.update((a) => (a === action ? null : action));
+    const next = this.pendingAction() === action ? null : action;
+    this.pendingAction.set(next);
+
+    if (next === 'suspend') {
+      this.dates.enable({ emitEvent: false });
+    } else {
+      // Suspend unchecked (or another option picked): dates disabled and cleared.
+      this.resetDates();
+    }
   }
 
   protected saveRow(user: ManagedUser): void {
@@ -158,6 +197,9 @@ export class UserManagement implements OnInit {
     if (action === 'delete' ? !this.canDelete() : !this.canUpdate()) return;
 
     if (action === 'delete') {
+      // Confirmation first. No / Cancel -> user is not deleted.
+      if (!window.confirm(`Are you sure you want to delete ${user.username}?`)) return;
+
       this.api
         .remove([user.id])
         .pipe(takeUntilDestroyed(this.destroyRef))
@@ -165,7 +207,7 @@ export class UserManagement implements OnInit {
           next: () => {
             this.selected.update((s) => new Set([...s].filter((id) => id !== user.id)));
             this.notify(`${user.username} was deleted`);
-            this.closeAll();
+            this.discard();
           },
           error: (e: HttpErrorResponse) => this.notify(this.errorText(e, 'Unable to delete the user.')),
         });
@@ -175,17 +217,25 @@ export class UserManagement implements OnInit {
     const status: UserStatus =
       action === 'suspend' ? 'Suspended' : action === 'active' ? 'Active' : 'Inactive';
     const { start, end } = this.dates.getRawValue();
-    if (status === 'Suspended' && (!start || !end)) {
-      this.notify('Select the suspension start and end dates');
-      return;
+
+    if (status === 'Suspended') {
+      if (!start || !end) {
+        this.notify('Select the suspension start and end dates');
+        return;
+      }
+      if (end < start) {
+        this.notify('End date cannot be before the start date');
+        return;
+      }
     }
+
     this.api
       .setStatus(user.id, status, start, end)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: () => {
           this.notify(`${user.username} is now ${status.toLowerCase()}`);
-          this.closeAll();
+          this.discard();
         },
         error: (e: HttpErrorResponse) => this.notify(this.errorText(e, 'Unable to update the user.')),
       });

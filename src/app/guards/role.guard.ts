@@ -1,5 +1,5 @@
 import { inject } from '@angular/core';
-import { CanActivateFn, Router } from '@angular/router';
+import { CanActivateFn, CanDeactivateFn, Router } from '@angular/router';
 import { catchError, map, of } from 'rxjs';
 
 import { AccessRequirement, AuthService } from '../services/auth';
@@ -121,3 +121,11 @@ export const featureGuard =
     if (!auth.user()) return router.createUrlTree(['/auth']);
     return auth.canAny(requirements) ? true : router.createUrlTree([homeRouteFor(auth.user())]);
   };
+
+/**
+ * Usage: `canDeactivate: [unsavedChangesGuard]` - asks before leaving a page that has unsaved changes.
+ * The page component must have a `hasUnsavedChanges(): boolean` method.
+ */
+export const unsavedChangesGuard: CanDeactivateFn<{ hasUnsavedChanges(): boolean }> = (component) =>
+  !component.hasUnsavedChanges() ||
+  window.confirm('You have unsaved changes. Are you sure you want to leave this page?');
