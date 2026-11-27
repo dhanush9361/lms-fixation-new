@@ -12,7 +12,14 @@ export interface CourseCheckout {
   courseName: string;
   description?: string | null;
   thumbnailUrl?: string | null;
+  /** Price of the course (before tax, or including it when pricesIncludeTax). */
   price: number;
+  /** Tax of the course's organization; 0 = no tax line. */
+  taxRate: number;
+  taxAmount: number;
+  pricesIncludeTax: boolean;
+  /** What the learner pays. */
+  total: number;
   alreadyEnrolled: boolean;
 }
 
@@ -40,7 +47,12 @@ export interface CoursePurchasePayload {
 export interface CoursePurchaseResult {
   courseId: number;
   courseName: string;
+  /** Total paid. */
   amount: number;
+  subtotal: number;
+  taxRate: number;
+  taxAmount: number;
+  pricesIncludeTax: boolean;
   purchasedAt: string;
   enrollmentStatus: string;
 }

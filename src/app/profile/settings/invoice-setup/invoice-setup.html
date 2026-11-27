@@ -1,0 +1,439 @@
+<div class="w-full px-2 pb-2 pt-3 font-dmsans text-[#4a4a4a]" [formGroup]="form">
+
+  @if (loading()) {
+    <p class="py-10 text-center text-[13px] text-[#888]" role="status">Loading invoice setup…</p>
+  } @else if (loadError()) {
+    <div class="flex flex-col items-center gap-4 py-10" role="alert">
+      <p class="text-[13px] text-red-500">{{ loadError() }}</p>
+      <button type="button" (click)="load()"
+              class="h-9 rounded-full bg-white px-5 text-[13px] shadow-md ring-1 ring-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#62B9CE] hover:text-white hover:shadow-lg active:scale-95">
+        Try again
+      </button>
+    </div>
+  } @else {
+
+  <div class="transition-all duration-700 ease-out"
+       [class]="mounted() ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-6'">
+
+    <!-- Tabs + actions (z-30 keeps the dropdown above the sections below) -->
+    <div class="relative z-30 flex flex-wrap items-center justify-between gap-4">
+
+      <!-- Tabs -->
+      <div class="flex items-center gap-5" role="tablist" aria-label="Invoice setup sections">
+        <button type="button" role="tab" id="invoice-tab-setup" aria-controls="invoice-panel-setup"
+                [attr.aria-selected]="activeTab() === 'setup'" (click)="setTab('setup')"
+                class="relative pb-2 text-[18px] transition-colors duration-300"
+                [class]="activeTab() === 'setup' ? 'font-medium text-[#4a4a4a]' : 'text-[#767676] hover:text-[#555]'">
+          Set Up
+          <span class="absolute bottom-0 left-0 h-[2px] rounded-full bg-[#62B9CE] transition-all duration-300"
+                [class]="activeTab() === 'setup' ? 'w-full opacity-100' : 'w-0 opacity-0'"></span>
+        </button>
+        <button type="button" role="tab" id="invoice-tab-appearance" aria-controls="invoice-panel-appearance"
+                [attr.aria-selected]="activeTab() === 'appearance'" (click)="setTab('appearance')"
+                class="relative pb-2 text-[18px] transition-colors duration-300"
+                [class]="activeTab() === 'appearance' ? 'font-medium text-[#4a4a4a]' : 'text-[#767676] hover:text-[#555]'">
+          Appearance
+          <span class="absolute bottom-0 left-0 h-[2px] rounded-full bg-[#62B9CE] transition-all duration-300"
+                [class]="activeTab() === 'appearance' ? 'w-full opacity-100' : 'w-0 opacity-0'"></span>
+        </button>
+      </div>
+
+      <!-- Actions: Set Up = Save, Cancel | Appearance = Save, Cancel, Preview -->
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="button" (click)="save()" [disabled]="saving()"
+                class="h-9 min-w-[84px] rounded-full bg-white px-5 text-[13px] shadow-md ring-1 ring-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:bg-[#62B9CE] hover:text-white hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+          {{ saving() ? 'Saving…' : 'Save' }}
+        </button>
+        <button type="button" (click)="cancel()" [disabled]="saving()"
+                class="h-9 min-w-[96px] rounded-full bg-white px-5 text-[13px] shadow-md ring-1 ring-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95 disabled:cursor-not-allowed disabled:opacity-60">
+          Cancel
+        </button>
+
+        <!-- Preview dropdown (Appearance tab only) -->
+        @if (activeTab() === 'appearance') {
+          <div class="relative" (click)="$event.stopPropagation()">
+            <button type="button" (click)="togglePreviewMenu()"
+                    aria-haspopup="true" [attr.aria-expanded]="previewMenuOpen()"
+                    class="flex h-9 min-w-[96px] items-center justify-center gap-2 rounded-full bg-white px-5 text-[13px] shadow-md ring-1 ring-black/5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg active:scale-95">
+              Preview
+              <svg class="h-3.5 w-3.5 transition-transform duration-300" [class]="previewMenuOpen() ? 'rotate-180' : ''"
+                   viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+            </button>
+            <div class="absolute right-0 top-[calc(100%+8px)] z-30 w-52 origin-top-right overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl ring-1 ring-black/5 transition-all duration-200 ease-out"
+                 [class]="previewMenuOpen() ? 'visible scale-100 opacity-100' : 'invisible scale-95 opacity-0'">
+              <button type="button" (click)="openModal('invoice')"
+                      class="w-full rounded-xl px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-[#f5f5f5]">Preview Invoice</button>
+              <button type="button" (click)="openModal('creditNote')"
+                      class="w-full rounded-xl px-4 py-2.5 text-left text-[13px] transition-colors hover:bg-[#f5f5f5]">Preview Credit Note</button>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+
+    <!-- ================= TAB 1 : SET UP ================= -->
+    <div id="invoice-panel-setup" role="tabpanel" aria-labelledby="invoice-tab-setup"
+         class="grid transition-[grid-template-rows,opacity,visibility] duration-500 ease-in-out"
+         [class]="activeTab() === 'setup' ? 'visible grid-rows-[1fr] opacity-100' : 'invisible grid-rows-[0fr] opacity-0'"
+         [attr.aria-hidden]="activeTab() !== 'setup'">
+      <div class="overflow-hidden">
+        <div class="mt-6 space-y-5">
+
+          <!-- Built-in invoicing -->
+          <section class="rounded-[24px] bg-[#f5f5f5] p-6 transition-all duration-700 ease-out"
+                   [class]="mounted() ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'"
+                   [style.transition-delay.ms]="200">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="sm:w-1/2">
+                <h3 class="text-[14px] font-medium">Built-in Invoicing</h3>
+                <p class="mt-3 text-[13px] text-[#555]">Automatically create and attach invoices to processed transactions</p>
+              </div>
+              <div class="sm:w-1/2 sm:pl-4">
+                <h3 class="text-[14px] font-medium">Active/Deactive</h3>
+                <button type="button" (click)="toggleSwitch('builtInEnabled')" role="checkbox"
+                        [attr.aria-checked]="value().builtInEnabled"
+                        class="mt-3 flex items-center gap-3 text-[13px] text-[#555]">
+                  <span class="flex h-5 w-5 items-center justify-center rounded-md transition-all duration-300"
+                        [class]="value().builtInEnabled ? 'bg-[#62B9CE] scale-110' : 'bg-[#dcdcdc]'">
+                    <svg class="h-3.5 w-3.5 text-white transition-all duration-300"
+                         [class]="value().builtInEnabled ? 'scale-100 opacity-100' : 'scale-0 opacity-0'"
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>
+                  </span>
+                  {{ value().builtInEnabled ? 'Active' : 'Deactive' }}
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <!-- Prefix / numbering / VAT -->
+          <section class="rounded-[24px] bg-[#f5f5f5] p-5 sm:p-6 transition-all duration-700 ease-out"
+                   [class]="mounted() ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'"
+                   [style.transition-delay.ms]="280">
+
+            <h3 class="text-[14px] font-medium">Invoice prefix and numbering</h3>
+            <p class="mt-3 text-[13px] text-[#555]">Set your preferred invoice numbering and check the upcoming invoice number</p>
+            <div class="mt-6 grid max-w-[780px] grid-cols-1 gap-4 sm:grid-cols-2">
+              <input type="text" maxlength="20" placeholder="Invoice prefix" aria-label="Invoice prefix"
+                     [value]="value().invoicePrefix" (input)="onSanitized('invoicePrefix', $event)"
+                     class="h-11 w-full rounded-2xl bg-white px-6 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-shadow duration-200 focus:ring-2 focus:ring-[#62B9CE]/50" />
+              <input type="text" inputmode="numeric" maxlength="10" placeholder="Next Invoice number" aria-label="Next invoice number"
+                     [value]="value().nextInvoiceNumber" (input)="onDigits('nextInvoiceNumber', $event)"
+                     class="h-11 w-full rounded-2xl bg-white px-6 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-shadow duration-200 focus:ring-2 focus:ring-[#62B9CE]/50" />
+            </div>
+
+            <h3 class="mt-10 text-[14px] font-medium">Credit note prefix and numbering</h3>
+            <p class="mt-3 text-[13px] text-[#555]">Set your preferred credit note prefix and view the next credit note number</p>
+            <div class="mt-6 grid max-w-[780px] grid-cols-1 gap-4 sm:grid-cols-2">
+              <input type="text" maxlength="20" placeholder="Credit note prefix" aria-label="Credit note prefix"
+                     [value]="value().creditNotePrefix" (input)="onSanitized('creditNotePrefix', $event)"
+                     class="h-11 w-full rounded-2xl bg-white px-6 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-shadow duration-200 focus:ring-2 focus:ring-[#62B9CE]/50" />
+              <input type="text" inputmode="numeric" maxlength="10" placeholder="Next Credit note number" aria-label="Next credit note number"
+                     [value]="value().nextCreditNoteNumber" (input)="onDigits('nextCreditNoteNumber', $event)"
+                     class="h-11 w-full rounded-2xl bg-white px-6 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-shadow duration-200 focus:ring-2 focus:ring-[#62B9CE]/50" />
+            </div>
+
+            <h3 class="mt-10 text-[14px] font-medium">Company VAT number</h3>
+            <p class="mt-3 text-[13px] text-[#555]">Set your VAT number to display it on all generated invoices</p>
+            <div class="mt-6 grid max-w-[780px] grid-cols-1 gap-4 sm:grid-cols-2">
+              <input type="text" maxlength="20" placeholder="VAT Number" aria-label="VAT number"
+                     [value]="value().vatNumber" (input)="onSanitized('vatNumber', $event)"
+                     class="h-11 w-full rounded-2xl bg-white px-6 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-shadow duration-200 focus:ring-2 focus:ring-[#62B9CE]/50" />
+            </div>
+          </section>
+
+          <!-- Tax -->
+          <section class="rounded-[24px] bg-[#f5f5f5] p-5 sm:p-6 transition-all duration-700 ease-out"
+                   [class]="mounted() ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'"
+                   [style.transition-delay.ms]="320">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="sm:w-1/2">
+                <h3 class="text-[14px] font-medium">Tax rate</h3>
+                <p class="mt-3 text-[13px] text-[#555]">Tax percentage applied to every paid course purchase. Leave empty for no tax</p>
+              </div>
+              <div class="sm:w-1/2 sm:pl-4">
+                <div class="flex max-w-[220px] items-center gap-2">
+                  <input type="text" inputmode="decimal" maxlength="6" placeholder="Tax rate" aria-label="Tax rate in percent"
+                         [value]="value().taxRate" (input)="onTaxRate($event)"
+                         class="h-11 w-full rounded-2xl bg-white px-6 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-shadow duration-200 focus:ring-2 focus:ring-[#62B9CE]/50" />
+                  <span class="text-[13px] text-[#555]" aria-hidden="true">%</span>
+                </div>
+                <button type="button" (click)="toggleSwitch('pricesIncludeTax')" role="checkbox"
+                        [attr.aria-checked]="value().pricesIncludeTax"
+                        class="mt-4 flex items-center gap-3 text-[13px] text-[#555]">
+                  <span class="flex h-5 w-5 items-center justify-center rounded-md transition-all duration-300"
+                        [class]="value().pricesIncludeTax ? 'bg-[#62B9CE] scale-110' : 'bg-[#dcdcdc]'">
+                    <svg class="h-3.5 w-3.5 text-white transition-all duration-300"
+                         [class]="value().pricesIncludeTax ? 'scale-100 opacity-100' : 'scale-0 opacity-0'"
+                         viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 13l4 4L19 7"/></svg>
+                  </span>
+                  Course prices already include tax
+                </button>
+                <p class="mt-2 text-[12px] text-[#767676]">
+                  {{ value().pricesIncludeTax ? 'Learner pays the course price; the tax is shown inside it.' : 'Tax is added on top of the course price.' }}
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <!-- 100% discount -->
+          <section class="rounded-[24px] bg-[#f5f5f5] p-6 transition-all duration-700 ease-out"
+                   [class]="mounted() ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'"
+                   [style.transition-delay.ms]="360">
+            <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div class="sm:w-1/2">
+                <h3 class="text-[14px] font-medium" id="invoice-discount-label">Invoice for 100% discounts</h3>
+                <p class="mt-3 text-[13px] text-[#555]">Decide whether to generate invoices for purchases with a 100% discount</p>
+              </div>
+              <div class="sm:w-1/2 sm:pl-4">
+                <h3 class="text-[14px] font-medium">On/Off</h3>
+                <button type="button" (click)="toggleSwitch('invoiceForFullDiscount')" role="switch"
+                        aria-labelledby="invoice-discount-label"
+                        [attr.aria-checked]="value().invoiceForFullDiscount"
+                        class="relative mt-3 block h-[18px] w-[50px] rounded-full transition-colors duration-300"
+                        [class]="value().invoiceForFullDiscount ? 'bg-[#62B9CE]/40' : 'bg-white'">
+                  <span class="absolute left-0 top-1/2 h-[22px] w-[22px] -translate-y-1/2 rounded-full transition-all duration-300 ease-out"
+                        [class]="value().invoiceForFullDiscount ? 'translate-x-[28px] bg-[#62B9CE]' : 'translate-x-0 bg-[#c9e8ef]'"></span>
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <!-- ================= TAB 2 : APPEARANCE ================= -->
+    <div id="invoice-panel-appearance" role="tabpanel" aria-labelledby="invoice-tab-appearance"
+         class="grid transition-[grid-template-rows,opacity,visibility] duration-500 ease-in-out"
+         [class]="activeTab() === 'appearance' ? 'visible grid-rows-[1fr] opacity-100' : 'invisible grid-rows-[0fr] opacity-0'"
+         [attr.aria-hidden]="activeTab() !== 'appearance'">
+      <div class="overflow-hidden">
+        <div class="mt-6 space-y-5">
+
+          <!-- Logo / thank you / tax message -->
+          <section class="rounded-[24px] bg-[#f5f5f5] p-5 sm:p-6">
+            <h3 class="text-[14px] font-medium">Invoice/Credit note logo</h3>
+            <p class="mt-3 text-[13px] text-[#555]">Choose an image to feature in the upper-left corner of your invoices</p>
+
+            <div class="mt-5 space-y-3.5" role="radiogroup" aria-label="Invoice logo">
+              <button type="button" (click)="setShowLogo(false)" role="radio" [attr.aria-checked]="!value().showLogo"
+                      class="flex items-center gap-3 text-[13px] text-[#555]">
+                <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full transition-all duration-300"
+                      [class]="!value().showLogo ? 'bg-[#62B9CE] ring-4 ring-[#62B9CE]/25' : 'bg-[#dcdcdc]'"></span>
+                Do not show a logo
+              </button>
+              <button type="button" (click)="setShowLogo(true)" role="radio" [attr.aria-checked]="value().showLogo"
+                      class="flex items-center gap-3 text-[13px] text-[#555]">
+                <span class="flex h-3.5 w-3.5 items-center justify-center rounded-full transition-all duration-300"
+                      [class]="value().showLogo ? 'bg-[#62B9CE] ring-4 ring-[#62B9CE]/25' : 'bg-[#dcdcdc]'"></span>
+                Show a logo on Invoice
+              </button>
+
+              <!-- Upload logo (depends on 'Show a logo' being selected) -->
+              <div class="flex flex-wrap items-center gap-3">
+                <button type="button" (click)="logoInput.click()" [disabled]="!value().showLogo"
+                        class="flex items-center gap-3 text-[13px] text-[#555] transition-all duration-300"
+                        [class]="value().showLogo ? 'opacity-100 hover:text-black' : 'cursor-not-allowed opacity-40'">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 16V4M7 9l5-5 5 5M4 20h16"/></svg>
+                  Upload my logo
+                </button>
+                <input #logoInput type="file" accept=".jpg,.jpeg,.png,image/jpeg,image/png" class="hidden"
+                       aria-label="Upload logo" (change)="onLogoSelected($event)" />
+
+                @if (logoUrl() && value().showLogo) {
+                  <div class="flex items-center gap-2 rounded-full bg-white py-1 pl-1 pr-3 shadow-sm">
+                    <img [src]="logoUrl()" alt="Uploaded logo" class="h-7 w-7 rounded-full object-cover" />
+                    <span class="max-w-[160px] truncate text-[12px] text-[#555]">{{ logoName() }}</span>
+                    <button type="button" (click)="removeLogo()" class="text-[#767676] transition-colors hover:text-black" aria-label="Remove logo">
+                      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                    </button>
+                  </div>
+                }
+              </div>
+              @if (logoError()) {
+                <p class="text-[12px] text-red-600" role="alert">{{ logoError() }}</p>
+              }
+            </div>
+
+            <!-- Thank you message -->
+            <h3 class="mt-9 text-[14px] font-medium">Thank you message in invoices</h3>
+            <p class="mt-3 text-[13px] text-[#555]">Include a personalised thank you message at the bottom of your invoices</p>
+            <textarea rows="1" maxlength="500" placeholder="Enter a text message" aria-label="Thank you message"
+                      formControlName="thankYouMessage"
+                      class="mt-5 block h-11 w-full max-w-[360px] resize-none rounded-2xl bg-white px-5 py-3.5 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-all duration-300 focus:h-24 focus:ring-2 focus:ring-[#62B9CE]/50"></textarea>
+            <!-- Only the text is clickable, the > icon is not -->
+            <div class="mt-4 flex items-center gap-1.5 text-[13px] font-medium text-[#444]">
+              <svg class="pointer-events-none h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+              <button type="button" (click)="openModal('thankYou')"
+                      class="text-left transition-colors hover:text-[#4694A4]">
+                Sample preview for thank you message in invoice
+              </button>
+            </div>
+
+            <!-- Tax message -->
+            <h3 class="mt-9 text-[14px] font-medium">Tax message in invoices</h3>
+            <p class="mt-3 text-[13px] text-[#555]">Add a short message to explain your tax policy, such as VAT or sales tax, on your invoices</p>
+            <textarea rows="1" maxlength="500" placeholder="Enter a text message" aria-label="Tax message"
+                      formControlName="taxMessage"
+                      class="mt-5 block h-11 w-full max-w-[360px] resize-none rounded-2xl bg-white px-5 py-3.5 text-[13px] outline-none placeholder:text-[#8a8a8a] transition-all duration-300 focus:h-24 focus:ring-2 focus:ring-[#62B9CE]/50"></textarea>
+            <div class="mt-4 flex items-center gap-1.5 text-[13px] font-medium text-[#444]">
+              <svg class="pointer-events-none h-3 w-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>
+              <button type="button" (click)="openModal('tax')"
+                      class="text-left transition-colors hover:text-[#4694A4]">
+                Sample preview for tax message invoice
+              </button>
+            </div>
+          </section>
+
+          <!-- Collapsible text sections: one card per group, each opens on its own -->
+          @for (group of textGroups; track group.id) {
+            <section class="rounded-[24px] bg-[#f5f5f5] p-5 sm:p-6">
+
+              <button type="button" (click)="toggleGroup(group.id)"
+                      [attr.aria-expanded]="isGroupOpen(group.id)" [attr.aria-controls]="'invoice-group-' + group.id"
+                      class="group flex w-full items-start justify-between gap-4 text-left">
+                <span class="block">
+                  <span class="block text-[14px] font-medium">{{ group.title }}</span>
+                  <span class="mt-3 block text-[13px] text-[#555]">{{ group.description }}</span>
+                </span>
+
+                <span class="mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-all duration-200 group-hover:bg-white group-active:scale-90 sm:mr-24">
+                  <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true">
+                    <path d="M5 12h14"/>
+                    <path class="origin-center transition-transform duration-300" [class]="isGroupOpen(group.id) ? 'scale-y-0' : 'scale-y-100'" d="M12 5v14"/>
+                  </svg>
+                </span>
+              </button>
+
+              <div [id]="'invoice-group-' + group.id"
+                   class="grid transition-[grid-template-rows,opacity,visibility] duration-500 ease-in-out"
+                   [class]="isGroupOpen(group.id) ? 'visible grid-rows-[1fr] opacity-100' : 'invisible grid-rows-[0fr] opacity-0'">
+                <div class="overflow-hidden">
+                  <div class="grid max-w-[820px] grid-cols-1 gap-3 pt-8 sm:grid-cols-[1fr_1.85fr]">
+                    <div class="flex h-11 items-center rounded-2xl bg-white px-6 text-[13px] font-medium">Default Text</div>
+                    <div class="flex h-11 items-center rounded-2xl bg-white px-6 text-[13px] font-medium sm:pl-12">Edit Text</div>
+
+                    <!-- Default text list -->
+                    <div class="rounded-2xl bg-white px-6 py-3">
+                      @for (item of group.items; track item.key) {
+                        <div class="flex h-9 items-center text-[13px] font-medium">{{ item.label }}</div>
+                      }
+                    </div>
+
+                    <!-- Editable fields -->
+                    <div class="rounded-2xl bg-white px-4 py-3 sm:px-6" formGroupName="texts">
+                      @for (item of group.items; track item.key) {
+                        <div class="flex h-9 items-center">
+                          <input type="text" maxlength="100" [formControlName]="item.key"
+                                 [placeholder]="'Enter ' + item.label" [attr.aria-label]="'Custom text for ' + item.label"
+                                 class="w-full border-b border-[#e3e3e3] bg-transparent py-2 text-[12px] outline-none placeholder:text-[#8a8a8a] transition-colors duration-200 focus:border-[#62B9CE]" />
+                        </div>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          }
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ================= PREVIEW MODAL ================= -->
+  @if (modalOpen()) {
+    <div #previewModal popover="manual"
+         class="fixed inset-0 z-[100] m-0 flex h-full max-h-none w-full max-w-none items-center justify-center overflow-hidden border-0 bg-transparent p-4">
+
+      <!-- Blur only, no dark colour -->
+      <div class="absolute inset-0 backdrop-blur-[8px] transition-opacity duration-300"
+           [class]="modalVisible() ? 'opacity-100' : 'opacity-0'" (click)="closeModal()"></div>
+
+      <!-- Base font size controls the popup size (11px at 1440 x 900); all sizes inside use em -->
+      <div role="dialog" aria-modal="true" [attr.aria-label]="modalTitle()"
+           class="relative max-h-[94vh] w-full max-w-[72.5em] overflow-y-auto rounded-[1.25em] bg-white px-[2em] pb-[2em] pt-[2.25em] font-['Segoe_UI',system-ui,sans-serif] text-[length:clamp(8px,min(0.764vw,1.222vh),11px)] text-[#333] shadow-[0_20px_60px_rgba(0,0,0,0.18)] ring-1 ring-black/5 transition-all duration-300 ease-out"
+           [class]="modalVisible() ? 'translate-y-0 scale-100 opacity-100' : 'translate-y-6 scale-95 opacity-0'">
+
+        <!-- Red close button in the corner -->
+        <button #closeButton type="button" (click)="closeModal()" aria-label="Close"
+                class="group absolute right-0 top-0 flex h-[4em] w-[4em] items-center justify-center rounded-bl-[1.25em] rounded-tr-[1.25em] bg-[#d6322d] text-white outline-none transition-colors duration-200 hover:bg-[#c02722] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70">
+          <svg class="h-[1.5em] w-[1.5em] transition-transform duration-300 ease-out group-hover:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true">
+            <path d="M6 6l12 12M18 6L6 18"/>
+          </svg>
+        </button>
+
+        <!-- Modal header: title + description -->
+        <div class="pr-[4em]">
+          <h2 class="text-[2.375em] font-semibold leading-[1.37]">{{ modalTitle() }}</h2>
+          <div class="mt-[0.4em]">
+            <p class="text-[1.4375em] leading-[1.45] text-[#6f6f6f]">{{ modalDescription() }}</p>
+          </div>
+        </div>
+
+        <!-- Document card -->
+        <div class="mt-[2em] rounded-[1.375em] border border-[#e8e8e8] pb-[0.6875em] pl-[2.4375em] pr-[2.5625em]">
+
+          <!-- Title + number -->
+          <div class="flex min-h-[9.8125em] items-start justify-between gap-4 border-b border-[#e8e8e8]">
+            <div class="pt-[2.6875em]">
+              @if (value().showLogo && logoUrl()) {
+                <img [src]="logoUrl()" alt="Logo" class="mb-[1em] h-[3.5em] w-auto object-contain" />
+              }
+              <h3 class="text-[3em] font-semibold leading-[1.333]">{{ modalMode() === 'creditNote' ? 'Credit Note' : text('invoice') }}</h3>
+            </div>
+            <div class="pt-[2.5em] text-right">
+              <p class="text-[1.4375em] uppercase leading-[1.39] text-[#6f6f6f]">{{ text('invoiceNumber') }}</p>
+              <div class="mt-[0.5625em]">
+                <p class="text-[1.6875em] leading-[1.48]">{{ previewNumber() }}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Line items -->
+          <div class="pt-[1.9375em]">
+            <div class="text-[1.6875em]">
+              <div class="flex min-h-[2.315em] items-center justify-between gap-4"><span class="text-[#6f6f6f]">{{ text('customerDetails') }}</span><span class="text-right font-semibold text-[#111]">Sample Customer</span></div>
+              <div class="flex min-h-[2.315em] items-center justify-between gap-4"><span class="text-[#6f6f6f]">{{ text('description') }}</span><span class="text-right font-semibold text-[#111]">Sample purchase</span></div>
+              <div class="flex min-h-[2.315em] items-center justify-between gap-4"><span class="text-[#6f6f6f]">{{ text('subtotal') }}</span><span class="font-semibold text-[#111]">{{ sample().subtotal }}</span></div>
+              <div class="flex min-h-[2.315em] items-center justify-between gap-4"><span class="text-[#6f6f6f]">{{ sample().inclusive ? text('taxIncluded') : text('tax') }} ({{ sample().rate }}%)</span><span class="font-semibold text-[#111]">{{ sample().tax }}</span></div>
+            </div>
+          </div>
+
+          <!-- Split divider -->
+          <div class="mt-[0.5625em] grid grid-cols-2 gap-[2.375em]" aria-hidden="true">
+            <span class="h-px bg-[#e5e5e5]"></span>
+            <span class="h-px bg-[#e5e5e5]"></span>
+          </div>
+
+          <!-- Total -->
+          <div class="text-[1.6875em]">
+            <div class="flex min-h-[3.407em] items-center justify-between gap-4">
+              <span class="font-semibold">{{ text('totalAmount') }}</span>
+              <span class="font-medium">{{ sample().total }}</span>
+            </div>
+          </div>
+
+          <!-- Optional messages -->
+          @if (showTaxMessage()) {
+            <div class="pb-[1em]">
+              <p class="break-words text-[1.4375em] text-[#666]">{{ value().taxMessage }}</p>
+            </div>
+          }
+          @if (showThankYou()) {
+            <div class="pb-[1em]">
+              <p class="break-words text-[1.5em] font-medium text-[#4a4a4a]">{{ value().thankYouMessage }}</p>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  }
+
+  <!-- Toast -->
+  <div class="fixed bottom-6 left-1/2 z-[110] -translate-x-1/2 rounded-full bg-[#333] px-6 py-3 text-[13px] text-white shadow-xl transition-all duration-300"
+       [class]="toast() ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-4 opacity-0'"
+       role="status" aria-live="polite">
+    {{ toast() }}
+  </div>
+</div>

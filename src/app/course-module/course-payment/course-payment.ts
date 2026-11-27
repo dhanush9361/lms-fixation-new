@@ -67,7 +67,7 @@ export class CoursePayment implements OnInit {
   protected readonly course = signal<CourseCheckout | null>(null);
 
   /** Display amount (USD). The server charges the price stored in the database, never this number. */
-  protected readonly amountDue = computed(() => this.course()?.price ?? 0);
+  protected readonly amountDue = computed(() => this.course()?.total ?? this.course()?.price ?? 0);
 
   protected readonly paymentMethod = signal<PaymentMethod | null>(null);
   protected readonly expandedPaymentMethod = signal<PaymentMethod | null>(null);

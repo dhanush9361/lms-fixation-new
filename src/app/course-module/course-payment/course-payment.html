@@ -468,8 +468,14 @@
             </div>
             <div class="flex items-center justify-between gap-4 text-[11px]">
               <dt class="text-[#686f71]">Course Cost</dt>
-              <dd class="font-medium text-[#444b4d]">{{ amountDue() | currency:'USD':'symbol':'1.0-2' }}</dd>
+              <dd class="font-medium text-[#444b4d]">{{ course.price | currency:'USD':'symbol':'1.0-2' }}</dd>
             </div>
+            @if (course.taxRate > 0) {
+              <div class="flex items-center justify-between gap-4 text-[11px]">
+                <dt class="text-[#686f71]">{{ course.pricesIncludeTax ? 'Includes Tax' : 'Tax' }} ({{ course.taxRate }}%)</dt>
+                <dd class="font-medium text-[#444b4d]">{{ course.taxAmount | currency:'USD':'symbol':'1.0-2' }}</dd>
+              </div>
+            }
           </dl>
 
           <div class="mt-5">
